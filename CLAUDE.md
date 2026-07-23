@@ -42,3 +42,7 @@ No test runner is configured in `package.json` yet.
 ## Spec-driven workflow
 
 Per `README.md`, this project follows spec-driven design using the `/spec` and `/spec-impl` commands from https://github.com/Klerith/fernando-skills (installed via `npx skills@latest add Klerith/fernando-skills`). Prefer writing/updating a spec before implementing non-trivial features if these commands are available in the environment.
+
+#skills
+
+necesito que siempre ejecutes la skill /frontend-design para diseñar interfacez de usuario
