@@ -1,6 +1,6 @@
 # SPEC 01 — MVP de vistas de Arcade Vault
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** Ninguno (primer spec del proyecto)
 > **Fecha:** 2026-07-27
 > **Objetivo:** Portar las 5 vistas del prototipo estático de Arcade Vault (biblioteca, detalle, player simulado, login mock y salón de la fama) a rutas reales de Next.js App Router, con datos mock, diseño neón fiel al original y persistencia de sesión/puntajes en localStorage, sin backend ni lógica de juego real.
@@ -112,27 +112,27 @@ Convenciones:
 
 ## Acceptance criteria
 
-- [ ] `npm run build` y `npm run lint` corren sin errores.
-- [ ] `/` muestra el hero, el buscador y las 4 chips de categoría (`TODOS`, `ARCADE`, `PUZZLE`, `SHOOTER`, `VERSUS`) con los 8 juegos de `GAMES`.
-- [ ] Escribir en el buscador de `/` filtra las tarjetas por título en tiempo real; si no hay resultados se muestra el mensaje "NO HAY RESULTADOS".
-- [ ] Click en una chip de categoría filtra el grid a esa categoría; click en "TODOS" restaura el listado completo.
-- [ ] Click en una tarjeta o en su botón "JUGAR" navega a `/games/[id]` con el `id` correcto.
-- [ ] `/games/[id]` muestra cover, tags, descripción larga, stat strip y una tabla de 10 puntuaciones generadas por `seededScores`.
-- [ ] Visitar `/games/id-inexistente` dispara `notFound()` (página 404 de Next.js).
-- [ ] El botón "JUGAR AHORA" en `/games/[id]` navega a `/games/[id]/play`.
-- [ ] En `/games/[id]/play` la puntuación sube automáticamente cada ~220ms mientras el juego no está en pausa ni terminado.
-- [ ] El botón "PAUSA" detiene el incremento de puntuación y muestra el overlay "EN PAUSA"; "REANUDAR" lo reactiva.
-- [ ] El botón "FIN" muestra el modal de fin de partida con la puntuación final.
-- [ ] Guardar la puntuación en el modal agrega una entrada nueva a `localStorage["av_scores"]` con `{ game, score, name, at }`.
-- [ ] "JUGAR DE NUEVO" reinicia puntuación, vidas, nivel y cierra el modal sin salir de la ruta.
-- [ ] `/login` permite iniciar sesión con cualquier nombre de usuario (sin validar contraseña) y redirige a `/`.
-- [ ] Al iniciar sesión desde `/login`, el `Nav` (visible en cualquier ruta) refleja el nombre de usuario sin recargar la página.
-- [ ] "JUGAR COMO INVITADO" en `/login` navega a `/` sin usuario logueado.
-- [ ] Cerrar sesión desde el `Nav` limpia `localStorage["av_user"]` y el botón vuelve a mostrar "Iniciar Sesión".
-- [ ] Recargar la página conserva la sesión (`av_user`) leída desde `localStorage`.
-- [ ] `/leaderboard` muestra tabs por cada uno de los 8 juegos; cambiar de tab actualiza podio y tabla con datos de `seededScores`.
-- [ ] Si hay sesión iniciada, `/leaderboard` muestra la fila "TU MEJOR MARCA"; si no hay sesión, esa fila no aparece.
-- [ ] El `Nav` mobile (hamburguesa) abre y cierra el panel lateral con los mismos links que la versión desktop.
+- [x] `npm run build` y `npm run lint` corren sin errores.
+- [x] `/` muestra el hero, el buscador y las 4 chips de categoría (`TODOS`, `ARCADE`, `PUZZLE`, `SHOOTER`, `VERSUS`) con los 8 juegos de `GAMES`.
+- [x] Escribir en el buscador de `/` filtra las tarjetas por título en tiempo real; si no hay resultados se muestra el mensaje "NO HAY RESULTADOS".
+- [x] Click en una chip de categoría filtra el grid a esa categoría; click en "TODOS" restaura el listado completo.
+- [x] Click en una tarjeta o en su botón "JUGAR" navega a `/games/[id]` con el `id` correcto.
+- [x] `/games/[id]` muestra cover, tags, descripción larga, stat strip y una tabla de 10 puntuaciones generadas por `seededScores`.
+- [x] Visitar `/games/id-inexistente` dispara `notFound()` (página 404 de Next.js).
+- [x] El botón "JUGAR AHORA" en `/games/[id]` navega a `/games/[id]/play`.
+- [x] En `/games/[id]/play` la puntuación sube automáticamente cada ~220ms mientras el juego no está en pausa ni terminado.
+- [x] El botón "PAUSA" detiene el incremento de puntuación y muestra el overlay "EN PAUSA"; "REANUDAR" lo reactiva.
+- [x] El botón "FIN" muestra el modal de fin de partida con la puntuación final.
+- [x] Guardar la puntuación en el modal agrega una entrada nueva a `localStorage["av_scores"]` con `{ game, score, name, at }`.
+- [x] "JUGAR DE NUEVO" reinicia puntuación, vidas, nivel y cierra el modal sin salir de la ruta.
+- [x] `/login` permite iniciar sesión con cualquier nombre de usuario (sin validar contraseña) y redirige a `/`.
+- [x] Al iniciar sesión desde `/login`, el `Nav` (visible en cualquier ruta) refleja el nombre de usuario sin recargar la página.
+- [x] "JUGAR COMO INVITADO" en `/login` navega a `/` sin usuario logueado.
+- [x] Cerrar sesión desde el `Nav` limpia `localStorage["av_user"]` y el botón vuelve a mostrar "Iniciar Sesión".
+- [x] Recargar la página conserva la sesión (`av_user`) leída desde `localStorage`.
+- [x] `/leaderboard` muestra tabs por cada uno de los 8 juegos; cambiar de tab actualiza podio y tabla con datos de `seededScores`.
+- [x] Si hay sesión iniciada, `/leaderboard` muestra la fila "TU MEJOR MARCA"; si no hay sesión, esa fila no aparece.
+- [x] El `Nav` mobile (hamburguesa) abre y cierra el panel lateral con los mismos links que la versión desktop.
 
 ## Decisions
 
