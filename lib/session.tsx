@@ -19,8 +19,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
+    // Sincroniza con localStorage (sistema externo, solo disponible en cliente).
     try {
       const raw = localStorage.getItem("av_user");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(raw ? JSON.parse(raw) : null);
     } catch {
       setUser(null);

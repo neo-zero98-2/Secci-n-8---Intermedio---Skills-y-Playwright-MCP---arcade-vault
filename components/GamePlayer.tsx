@@ -18,6 +18,8 @@ export default function GamePlayer({ game }: { game: Game }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    // Sincroniza con la sesión (se hidrata async desde localStorage tras el primer render).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) setName(user.name);
   }, [user]);
 
@@ -28,6 +30,8 @@ export default function GamePlayer({ game }: { game: Game }) {
   }, [over, paused]);
 
   useEffect(() => {
+    // Ratchet de nivel: mismo simulador que el prototipo (avanza ~cada 2500 puntos).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
   }, [score]);
 
