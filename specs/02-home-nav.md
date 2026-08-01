@@ -1,6 +1,6 @@
 # SPEC 02 — Home y navegación ampliada de Arcade Vault
 
-> **Estado:** Approved
+> **Estado:** Implementado
 > **Depende de:** SPEC 01
 > **Fecha:** 2026-07-31
 > **Objetivo:** Portar la pantalla "Inicio" del prototipo (`home.jsx`) como nueva landing en `/`, reubicar la Biblioteca actual de `/` a `/games`, y ampliar el `Nav` global con los links "Inicio" y "Acerca de" (este último deshabilitado, sin ruta destino).

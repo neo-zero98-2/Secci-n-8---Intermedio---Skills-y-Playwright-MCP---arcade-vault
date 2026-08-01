@@ -15,12 +15,12 @@ export default function LoginPage() {
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     login({ name: (user || "PLAYER1").toUpperCase().slice(0, 10) });
-    router.push("/");
+    router.push("/games");
   };
 
   const playAsGuest = () => {
     login(null);
-    router.push("/");
+    router.push("/games");
   };
 
   return (
