@@ -14,3 +14,13 @@ https://github.com/Klerith/fernando-skills
 ```bash
 npx skills@latest add Klerith/fernando-skills
 ```
+
+## Commands
+
+```bash
+npm run dev      # start dev server (Next.js, Turbopack unless configured otherwise)
+npm run build    # production build
+npm run start    # run production build
+npm run lint     # ESLint (flat config in eslint.config.mjs, extends eslint-config-next)
+```
+
