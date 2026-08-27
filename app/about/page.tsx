@@ -91,7 +91,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <div className="about-divider" aria-hidden="true">
+      <div className="about-divider reveal" aria-hidden="true">
         <div className="div-bar"></div>
         <div className="div-pixels">
           {Array.from({ length: 24 }).map((_, i) => (
@@ -101,7 +101,7 @@ export default function AboutPage() {
         <div className="div-bar"></div>
       </div>
 
-      <section className="about-contact">
+      <section className="about-contact reveal">
         <div className="contact-grid">
           <div className="contact-intro">
             <div className="kicker pixel neon-cyan">▸ CONTACTO</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 type ContactFormState = { name: string; email: string; msg: string };
 type ContactStatus = "idle" | "sending" | "sent" | "error";
@@ -10,6 +10,23 @@ const EMPTY_FORM: ContactFormState = { name: "", email: "", msg: "" };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ContactForm() {
+  useEffect(() => {
+    const els = document.querySelectorAll(".reveal");
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [status, setStatus] = useState<ContactStatus>("idle");
   const [shake, setShake] = useState(false);
