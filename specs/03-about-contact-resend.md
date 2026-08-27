@@ -1,6 +1,6 @@
 # SPEC 03 — About page y formulario de contacto con Resend
 
-> **Estado:** Approved
+> **Estado:** Implemented
 > **Depende de:** SPEC 01, SPEC 02
 > **Fecha:** 2026-08-26
 > **Objetivo:** Portar la pantalla "Acerca de" del prototipo (`about.jsx`) a la ruta `/about`, con el formulario de contacto conectado a un endpoint real que envía el mensaje por correo mediante Resend (modo sandbox).
@@ -75,20 +75,20 @@ Convenciones:
 
 ## Acceptance criteria
 
-- [ ] `npm run build` y `npm run lint` corren sin errores.
-- [ ] `/about` muestra el hero ("Acerca de Arcade Vault"), la misión y los 3 highlights, con el mismo diseño neón del template.
-- [ ] La sección de contacto muestra la intro, los 3 tips y el formulario (nombre, email, mensaje).
-- [ ] Enviar el formulario con algún campo vacío dispara la animación de shake y no llama al endpoint.
-- [ ] Enviar el formulario con un email de formato inválido dispara la animación de shake y no llama al endpoint.
-- [ ] Enviar el formulario con datos válidos deshabilita el botón y muestra el estado "ENVIANDO…" con spinner mientras espera la respuesta.
-- [ ] Si el envío es exitoso, se reemplaza el formulario por la terminal "VAULT-OS" con el nombre del remitente en mayúsculas.
-- [ ] "ENVIAR OTRO MENSAJE" en la terminal de éxito resetea el formulario a su estado inicial vacío.
-- [ ] Si el envío falla (ej. `RESEND_API_KEY` inválida o ausente), el formulario vuelve a estado editable conservando los valores escritos, muestra un mensaje de error visible y reactiva el botón "ENVIAR MENSAJE".
-- [ ] Un envío válido efectivamente llega como correo a la dirección configurada en `CONTACT_TO_EMAIL`.
-- [ ] El `Nav` (desktop y mobile) muestra "Acerca de" como link activo (no deshabilitado); click navega a `/about`.
-- [ ] El link "Acerca de" del `Nav` se marca activo únicamente cuando `pathname === "/about"`.
-- [ ] Las reglas CSS `.disabled` quedan eliminadas de `app/globals.css` y no queda ningún `<span className="disabled">` en `components/Nav.tsx`.
-- [ ] La sección de contacto con clase `.reveal` recibe la clase `.in` y aparece con transición al hacer scroll.
+- [x] `npm run build` y `npm run lint` corren sin errores.
+- [x] `/about` muestra el hero ("Acerca de Arcade Vault"), la misión y los 3 highlights, con el mismo diseño neón del template.
+- [x] La sección de contacto muestra la intro, los 3 tips y el formulario (nombre, email, mensaje).
+- [x] Enviar el formulario con algún campo vacío dispara la animación de shake y no llama al endpoint.
+- [x] Enviar el formulario con un email de formato inválido dispara la animación de shake y no llama al endpoint.
+- [x] Enviar el formulario con datos válidos deshabilita el botón y muestra el estado "ENVIANDO…" con spinner mientras espera la respuesta.
+- [x] Si el envío es exitoso, se reemplaza el formulario por la terminal "VAULT-OS" con el nombre del remitente en mayúsculas.
+- [x] "ENVIAR OTRO MENSAJE" en la terminal de éxito resetea el formulario a su estado inicial vacío.
+- [x] Si el envío falla (ej. `RESEND_API_KEY` inválida o ausente), el formulario vuelve a estado editable conservando los valores escritos, muestra un mensaje de error visible y reactiva el botón "ENVIAR MENSAJE".
+- [x] Un envío válido efectivamente llega como correo a la dirección configurada en `CONTACT_TO_EMAIL`.
+- [x] El `Nav` (desktop y mobile) muestra "Acerca de" como link activo (no deshabilitado); click navega a `/about`.
+- [x] El link "Acerca de" del `Nav` se marca activo únicamente cuando `pathname === "/about"`.
+- [x] Las reglas CSS `.disabled` quedan eliminadas de `app/globals.css` y no queda ningún `<span className="disabled">` en `components/Nav.tsx`.
+- [x] La sección de contacto con clase `.reveal` recibe la clase `.in` y aparece con transición al hacer scroll.
 
 ## Decisions
 
