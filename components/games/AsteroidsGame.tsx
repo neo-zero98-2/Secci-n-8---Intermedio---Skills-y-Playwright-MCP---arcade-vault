@@ -18,6 +18,9 @@ const TRIPLE_SPREAD = 0.18;
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const wrap = (v: number, max: number) => ((v % max) + max) % max;
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
+const randInt = (min: number, max: number) => Math.floor(rand(min, max + 1));
+const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.hypot(a.x - b.x, a.y - b.y);
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 type Keys = Record<string, boolean>;
@@ -56,6 +59,114 @@ class Bullet {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+// ── Asteroid ──────────────────────────────────────────────────────────────────
+const RADII = [0, 16, 30, 50]; // por tamaño 1, 2, 3
+const SPEEDS = [0, 85, 55, 32]; // velocidad base por tamaño
+const POINTS = [0, 100, 50, 20]; // puntos por tamaño
+
+class Asteroid {
+  x: number;
+  y: number;
+  size: number;
+  radius: number;
+  vx: number;
+  vy: number;
+  rotSpeed: number;
+  rot: number;
+  verts: [number, number][] = [];
+  dead = false;
+
+  constructor(x: number, y: number, size = 3) {
+    this.x = x;
+    this.y = y;
+    this.size = size;
+    this.radius = RADII[size];
+
+    const angle = rand(0, Math.PI * 2);
+    const speed = SPEEDS[size] + rand(-15, 15);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.rotSpeed = rand(-1.2, 1.2);
+    this.rot = rand(0, Math.PI * 2);
+
+    // Polígono irregular
+    const n = randInt(8, 13);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const r = this.radius * rand(0.6, 1.0);
+      this.verts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+  }
+
+  update(dt: number) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.rot += this.rotSpeed * dt;
+  }
+
+  split(): Asteroid[] {
+    if (this.size <= 1) return [];
+    return [
+      new Asteroid(this.x, this.y, this.size - 1),
+      new Asteroid(this.x, this.y, this.size - 1),
+    ];
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rot);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(this.verts[0][0], this.verts[0][1]);
+    for (let i = 1; i < this.verts.length; i++) ctx.lineTo(this.verts[i][0], this.verts[i][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ── Partículas (explosión) ────────────────────────────────────────────────────
+class Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  ttl: number;
+  dead = false;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    const angle = rand(0, Math.PI * 2);
+    const speed = rand(30, 130);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.life = rand(0.4, 1.1);
+    this.ttl = this.life;
+  }
+
+  update(dt: number) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    const alpha = this.ttl / this.life;
+    ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
+    ctx.stroke();
   }
 }
 
@@ -162,9 +273,89 @@ class Ship {
   }
 }
 
+// ── Estado del juego ──────────────────────────────────────────────────────────
+// Mutable y fuera de React: el loop corre a ~60fps y re-renderizar por frame
+// sería inaceptable. React solo se entera por callbacks (paso 7 del plan).
+type GameState = {
+  ship: Ship;
+  bullets: Bullet[];
+  asteroids: Asteroid[];
+  particles: Particle[];
+  score: number;
+};
+
+function spawnAsteroids(g: GameState, count: number) {
+  const SAFE_DIST = 130;
+  for (let i = 0; i < count; i++) {
+    let x: number, y: number;
+    do {
+      x = rand(0, W);
+      y = rand(0, H);
+    } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
+    g.asteroids.push(new Asteroid(x, y, 3));
+  }
+}
+
+function createGame(): GameState {
+  const g: GameState = {
+    ship: new Ship(),
+    bullets: [],
+    asteroids: [],
+    particles: [],
+    score: 0,
+  };
+  spawnAsteroids(g, 4);
+  return g;
+}
+
+function explode(g: GameState, x: number, y: number, count = 8) {
+  for (let i = 0; i < count; i++) g.particles.push(new Particle(x, y));
+}
+
+function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) => boolean) {
+  if (pressed("Space")) g.bullets.push(...g.ship.tryShoot());
+
+  g.ship.update(dt, keys);
+  g.bullets.forEach((b) => b.update(dt));
+  g.asteroids.forEach((a) => a.update(dt));
+  g.particles.forEach((p) => p.update(dt));
+
+  g.bullets = g.bullets.filter((b) => !b.dead);
+  g.particles = g.particles.filter((p) => !p.dead);
+
+  // Bala vs asteroide
+  const newAsteroids: Asteroid[] = [];
+  for (const b of g.bullets) {
+    for (const a of g.asteroids) {
+      if (!a.dead && !b.dead && dist(b, a) < a.radius) {
+        b.dead = true;
+        a.dead = true;
+        g.score += POINTS[a.size];
+        explode(g, a.x, a.y, a.size * 5);
+        newAsteroids.push(...a.split());
+      }
+    }
+  }
+  g.asteroids = g.asteroids.filter((a) => !a.dead).concat(newAsteroids);
+  g.bullets = g.bullets.filter((b) => !b.dead);
+}
+
+function draw(ctx: CanvasRenderingContext2D, g: GameState) {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+
+  g.particles.forEach((p) => p.draw(ctx));
+  g.asteroids.forEach((a) => a.draw(ctx));
+  g.bullets.forEach((b) => b.draw(ctx));
+  g.ship.draw(ctx);
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 export default function AsteroidsGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // El estado del juego vive en un ref para que el paso 9 (restart/FIN) pueda
+  // alcanzarlo desde fuera del efecto.
+  const gameRef = useRef<GameState | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -176,8 +367,7 @@ export default function AsteroidsGame() {
     // (StrictMode monta dos veces en dev) arranca una partida limpia.
     const keys: Keys = {};
     const justPressed: Keys = {};
-    const ship = new Ship();
-    let bullets: Bullet[] = [];
+    gameRef.current = createGame();
 
     // Disparo por flanco: una pulsación = un disparo, sin autofire por key repeat.
     const pressed = (code: string) => {
@@ -205,16 +395,11 @@ export default function AsteroidsGame() {
       const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
       lastTime = ts;
 
-      if (pressed("Space")) bullets.push(...ship.tryShoot());
-
-      ship.update(dt, keys);
-      bullets.forEach((b) => b.update(dt));
-      bullets = bullets.filter((b) => !b.dead);
-
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, W, H);
-      bullets.forEach((b) => b.draw(ctx));
-      ship.draw(ctx);
+      const g = gameRef.current;
+      if (g) {
+        update(g, dt, keys, pressed);
+        draw(ctx, g);
+      }
 
       frame = requestAnimationFrame(loop);
     };
