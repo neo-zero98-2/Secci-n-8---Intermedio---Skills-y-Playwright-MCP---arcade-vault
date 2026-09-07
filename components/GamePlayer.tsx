@@ -4,10 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import type { Game } from "@/lib/games";
+import AsteroidsGame from "@/components/games/AsteroidsGame";
 
 export default function GamePlayer({ game }: { game: Game }) {
   const router = useRouter();
   const { user, saveScore } = useSession();
+
+  // Solo "rocas" tiene lógica de juego real; el resto sigue con el simulador decorativo.
+  const isAsteroids = game.id === "rocas";
 
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -83,13 +87,17 @@ export default function GamePlayer({ game }: { game: Game }) {
 
       <div className="crt">
         <div className="crt-screen">
-          <div className="game-arena">
-            <div className="grid-floor" />
-            <div className="enemy e1" />
-            <div className="enemy e2" />
-            <div className="enemy e3" />
-            <div className="player-ship" />
-          </div>
+          {isAsteroids ? (
+            <AsteroidsGame />
+          ) : (
+            <div className="game-arena">
+              <div className="grid-floor" />
+              <div className="enemy e1" />
+              <div className="enemy e2" />
+              <div className="enemy e3" />
+              <div className="player-ship" />
+            </div>
+          )}
           {paused && (
             <div className="crt-content" style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}>
               <div>
