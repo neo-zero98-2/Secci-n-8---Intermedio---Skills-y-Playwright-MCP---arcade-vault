@@ -12,6 +12,9 @@ const H = 600;
 // la colisión, así que se capa igual que en el original tras un blur largo.
 const MAX_DT = 0.05;
 
+// ── Constantes ────────────────────────────────────────────────────────────────
+const TRIPLE_SPREAD = 0.18;
+
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const wrap = (v: number, max: number) => ((v % max) + max) % max;
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
@@ -22,6 +25,39 @@ type Keys = Record<string, boolean>;
 // Teclas que el juego consume: sin preventDefault, las flechas y el espacio
 // hacen scroll de la página durante la partida.
 const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
+
+// ── Bullet ────────────────────────────────────────────────────────────────────
+class Bullet {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  ttl = 1.1;
+  radius = 2;
+  dead = false;
+
+  constructor(x: number, y: number, angle: number) {
+    this.x = x;
+    this.y = y;
+    const SPEED = 520;
+    this.vx = Math.cos(angle) * SPEED;
+    this.vy = Math.sin(angle) * SPEED;
+  }
+
+  update(dt: number) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
@@ -75,6 +111,22 @@ class Ship {
     this.y = wrap(this.y + this.vy * dt, H);
   }
 
+  tryShoot(): Bullet[] {
+    if (this.shootCooldown > 0 || this.dead) return [];
+    this.shootCooldown = 0.2;
+    const NOSE = 21;
+    const ox = this.x + Math.cos(this.angle) * NOSE;
+    const oy = this.y + Math.sin(this.angle) * NOSE;
+    if (this.tripleShot > 0) {
+      return [
+        new Bullet(ox, oy, this.angle - TRIPLE_SPREAD),
+        new Bullet(ox, oy, this.angle),
+        new Bullet(ox, oy, this.angle + TRIPLE_SPREAD),
+      ];
+    }
+    return [new Bullet(ox, oy, this.angle)];
+  }
+
   draw(ctx: CanvasRenderingContext2D) {
     if (this.dead) return;
     // Parpadeo durante invencibilidad de reaparición
@@ -123,10 +175,20 @@ export default function AsteroidsGame() {
     // Todo el estado vive dentro del efecto: sin globales de módulo, un remount
     // (StrictMode monta dos veces en dev) arranca una partida limpia.
     const keys: Keys = {};
+    const justPressed: Keys = {};
     const ship = new Ship();
+    let bullets: Bullet[] = [];
+
+    // Disparo por flanco: una pulsación = un disparo, sin autofire por key repeat.
+    const pressed = (code: string) => {
+      const val = justPressed[code];
+      justPressed[code] = false;
+      return val;
+    };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (GAME_KEYS.has(e.code)) e.preventDefault();
+      if (!keys[e.code]) justPressed[e.code] = true;
       keys[e.code] = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -143,10 +205,15 @@ export default function AsteroidsGame() {
       const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
       lastTime = ts;
 
+      if (pressed("Space")) bullets.push(...ship.tryShoot());
+
       ship.update(dt, keys);
+      bullets.forEach((b) => b.update(dt));
+      bullets = bullets.filter((b) => !b.dead);
 
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, W, H);
+      bullets.forEach((b) => b.draw(ctx));
       ship.draw(ctx);
 
       frame = requestAnimationFrame(loop);
