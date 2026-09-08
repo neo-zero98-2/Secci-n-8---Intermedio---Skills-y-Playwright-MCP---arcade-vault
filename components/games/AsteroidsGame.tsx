@@ -489,9 +489,24 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
   g.ship.draw(ctx);
 }
 
+// ── Contrato con React ────────────────────────────────────────────────────────
+// Lo único que cruza la frontera React ↔ canvas. Los callbacks se emiten solo
+// cuando el valor cambia respecto al último emitido, nunca en cada frame.
+type AsteroidsGameProps = {
+  onScoreChange: (score: number) => void;
+  onLivesChange: (lives: number) => void;
+  onLevelChange: (level: number) => void;
+};
+
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function AsteroidsGame() {
+export default function AsteroidsGame(props: AsteroidsGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Los callbacks viven en un ref para que el efecto del loop no dependa de su
+  // identidad: si dependiera, cada render de GamePlayer reiniciaría la partida.
+  const cbRef = useRef(props);
+  useEffect(() => {
+    cbRef.current = props;
+  });
   // El estado del juego vive en un ref para que el paso 9 (restart/FIN) pueda
   // alcanzarlo desde fuera del efecto.
   const gameRef = useRef<GameState | null>(null);
@@ -529,6 +544,8 @@ export default function AsteroidsGame() {
 
     let frame = 0;
     let lastTime: number | null = null;
+    // -1 fuerza una primera emisión que sincroniza el HUD con el estado real.
+    const emitido = { score: -1, lives: -1, level: -1 };
 
     const loop = (ts: number) => {
       const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
@@ -538,6 +555,19 @@ export default function AsteroidsGame() {
       if (g) {
         update(g, dt, keys, pressed);
         draw(ctx, g);
+
+        if (g.score !== emitido.score) {
+          emitido.score = g.score;
+          cbRef.current.onScoreChange(g.score);
+        }
+        if (g.lives !== emitido.lives) {
+          emitido.lives = g.lives;
+          cbRef.current.onLivesChange(g.lives);
+        }
+        if (g.level !== emitido.level) {
+          emitido.level = g.level;
+          cbRef.current.onLevelChange(g.level);
+        }
       }
 
       frame = requestAnimationFrame(loop);

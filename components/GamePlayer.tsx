@@ -28,16 +28,17 @@ export default function GamePlayer({ game }: { game: Game }) {
   }, [user]);
 
   useEffect(() => {
-    if (over || paused) return;
+    // Simulador de puntuación del prototipo: solo para los juegos sin lógica real.
+    if (over || paused || isAsteroids) return;
     const t = setInterval(() => setScore((s) => s + Math.floor(10 + Math.random() * 90)), 220);
     return () => clearInterval(t);
-  }, [over, paused]);
+  }, [over, paused, isAsteroids]);
 
   useEffect(() => {
     // Ratchet de nivel: mismo simulador que el prototipo (avanza ~cada 2500 puntos).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
-  }, [score]);
+    if (!isAsteroids && score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
+  }, [score, isAsteroids]);
 
   const endGame = () => setOver(true);
   const restart = () => {
@@ -88,7 +89,11 @@ export default function GamePlayer({ game }: { game: Game }) {
       <div className="crt">
         <div className="crt-screen">
           {isAsteroids ? (
-            <AsteroidsGame />
+            <AsteroidsGame
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setLevel}
+            />
           ) : (
             <div className="game-arena">
               <div className="grid-floor" />
