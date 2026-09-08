@@ -93,6 +93,10 @@ export default function GamePlayer({ game }: { game: Game }) {
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setLevel}
+              onGameOver={(finalScore) => {
+                setScore(finalScore);
+                setOver(true);
+              }}
             />
           ) : (
             <div className="game-arena">

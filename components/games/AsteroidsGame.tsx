@@ -496,6 +496,7 @@ type AsteroidsGameProps = {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;
+  onGameOver: (finalScore: number) => void;
 };
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -546,6 +547,9 @@ export default function AsteroidsGame(props: AsteroidsGameProps) {
     let lastTime: number | null = null;
     // -1 fuerza una primera emisión que sincroniza el HUD con el estado real.
     const emitido = { score: -1, lives: -1, level: -1 };
+    // El fin de partida se emite una sola vez por partida: manda el modal de
+    // GamePlayer. Aquí no hay overlay "GAME OVER" ni reinicio con Espacio.
+    let gameOverEmitido = false;
 
     const loop = (ts: number) => {
       const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
@@ -567,6 +571,10 @@ export default function AsteroidsGame(props: AsteroidsGameProps) {
         if (g.level !== emitido.level) {
           emitido.level = g.level;
           cbRef.current.onLevelChange(g.level);
+        }
+        if (g.phase === "gameover" && !gameOverEmitido) {
+          gameOverEmitido = true;
+          cbRef.current.onGameOver(g.score);
         }
       }
 
