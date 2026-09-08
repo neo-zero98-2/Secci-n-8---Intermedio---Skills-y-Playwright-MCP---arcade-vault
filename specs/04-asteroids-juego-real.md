@@ -1,6 +1,6 @@
 # SPEC 04 — Juego real de Asteroids en el slot "ROCAS"
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01
 > **Fecha:** 2026-09-07
 > **Objetivo:** Portar el juego Asteroids standalone de `references/started-games/02-asteroids/game.js` a un componente cliente de Next.js que reemplaza el simulador falso del juego "ROCAS" en `/games/rocas/play`, sincronizando su puntuación/vidas/nivel con el HUD, los botones de pausa/fin y el modal de fin de partida ya existentes en `GamePlayer`.
