@@ -13,6 +13,9 @@ const H = 600;
 const MAX_DT = 0.05;
 
 // ── Constantes ────────────────────────────────────────────────────────────────
+const POWERUP_DROP_CHANCE = 0.15;
+const POWERUP_DURATION = 5;
+const POWERUP_TTL = 12;
 const TRIPLE_SPREAD = 0.18;
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
@@ -170,6 +173,52 @@ class Particle {
   }
 }
 
+// ── PowerUp ───────────────────────────────────────────────────────────────────
+class PowerUp {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius = 12;
+  ttl = POWERUP_TTL;
+  dead = false;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    const angle = rand(0, Math.PI * 2);
+    const speed = rand(20, 40);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+  }
+
+  update(dt: number) {
+    this.x = wrap(this.x + this.vx * dt, W);
+    this.y = wrap(this.y + this.vy * dt, H);
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    // Parpadea los últimos 2s antes de expirar
+    if (this.ttl < 2 && Math.floor(this.ttl * 8) % 2 === 0) return;
+    const pulse = 0.85 + Math.sin(performance.now() / 150) * 0.15;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.PI / 4);
+    ctx.strokeStyle = "#0ff";
+    ctx.lineWidth = 2;
+    const r = this.radius * pulse;
+    ctx.strokeRect(-r, -r, r * 2, r * 2);
+    ctx.restore();
+    ctx.fillStyle = "#0ff";
+    ctx.font = "bold 12px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("3x", this.x, this.y);
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   x = W / 2;
@@ -283,12 +332,16 @@ type GameState = {
   bullets: Bullet[];
   asteroids: Asteroid[];
   particles: Particle[];
+  powerUps: PowerUp[];
   score: number;
   lives: number;
   level: number;
   // Renombrado desde `state` de game.js para no chocar con el vocabulario de React.
   phase: GamePhase;
   deadTimer: number;
+  // Un power-up por nivel: garantizado a los 5 kills si el 15% no ha saltado antes.
+  powerUpSpawned: boolean;
+  killsSinceSpawn: number;
 };
 
 function spawnAsteroids(g: GameState, count: number) {
@@ -309,11 +362,14 @@ function createGame(): GameState {
     bullets: [],
     asteroids: [],
     particles: [],
+    powerUps: [],
     score: 0,
     lives: 3,
     level: 1,
     phase: "playing",
     deadTimer: 0,
+    powerUpSpawned: false,
+    killsSinceSpawn: 0,
   };
   spawnAsteroids(g, 4);
   return g;
@@ -323,6 +379,9 @@ function nextLevel(g: GameState) {
   g.level++;
   g.bullets = [];
   g.particles = [];
+  g.powerUps = [];
+  g.powerUpSpawned = false;
+  g.killsSinceSpawn = 0;
   g.ship.reset();
   spawnAsteroids(g, 3 + g.level);
 }
@@ -367,9 +426,19 @@ function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) =>
   g.bullets.forEach((b) => b.update(dt));
   g.asteroids.forEach((a) => a.update(dt));
   g.particles.forEach((p) => p.update(dt));
+  g.powerUps.forEach((p) => p.update(dt));
 
   g.bullets = g.bullets.filter((b) => !b.dead);
   g.particles = g.particles.filter((p) => !p.dead);
+  g.powerUps = g.powerUps.filter((p) => !p.dead);
+
+  // Recogida por colisión: activa el disparo triple
+  for (const p of g.powerUps) {
+    if (!p.dead && dist(g.ship, p) < g.ship.radius + p.radius) {
+      p.dead = true;
+      g.ship.tripleShot = POWERUP_DURATION;
+    }
+  }
 
   // Bala vs asteroide
   const newAsteroids: Asteroid[] = [];
@@ -381,6 +450,14 @@ function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) =>
         g.score += POINTS[a.size];
         explode(g, a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
+        if (!g.powerUpSpawned) {
+          g.killsSinceSpawn++;
+          const guaranteed = g.killsSinceSpawn >= 5;
+          if (guaranteed || Math.random() < POWERUP_DROP_CHANCE) {
+            g.powerUps.push(new PowerUp(a.x, a.y));
+            g.powerUpSpawned = true;
+          }
+        }
       }
     }
   }
@@ -407,6 +484,7 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
 
   g.particles.forEach((p) => p.draw(ctx));
   g.asteroids.forEach((a) => a.draw(ctx));
+  g.powerUps.forEach((p) => p.draw(ctx));
   g.bullets.forEach((b) => b.draw(ctx));
   g.ship.draw(ctx);
 }
