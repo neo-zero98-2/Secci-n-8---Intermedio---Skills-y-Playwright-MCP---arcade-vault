@@ -276,12 +276,19 @@ class Ship {
 // ── Estado del juego ──────────────────────────────────────────────────────────
 // Mutable y fuera de React: el loop corre a ~60fps y re-renderizar por frame
 // sería inaceptable. React solo se entera por callbacks (paso 7 del plan).
+type GamePhase = "playing" | "dead" | "gameover";
+
 type GameState = {
   ship: Ship;
   bullets: Bullet[];
   asteroids: Asteroid[];
   particles: Particle[];
   score: number;
+  lives: number;
+  level: number;
+  // Renombrado desde `state` de game.js para no chocar con el vocabulario de React.
+  phase: GamePhase;
+  deadTimer: number;
 };
 
 function spawnAsteroids(g: GameState, count: number) {
@@ -303,16 +310,57 @@ function createGame(): GameState {
     asteroids: [],
     particles: [],
     score: 0,
+    lives: 3,
+    level: 1,
+    phase: "playing",
+    deadTimer: 0,
   };
   spawnAsteroids(g, 4);
   return g;
+}
+
+function nextLevel(g: GameState) {
+  g.level++;
+  g.bullets = [];
+  g.particles = [];
+  g.ship.reset();
+  spawnAsteroids(g, 3 + g.level);
 }
 
 function explode(g: GameState, x: number, y: number, count = 8) {
   for (let i = 0; i < count; i++) g.particles.push(new Particle(x, y));
 }
 
+function killShip(g: GameState) {
+  explode(g, g.ship.x, g.ship.y, 14);
+  g.ship.dead = true;
+  g.lives--;
+  if (g.lives <= 0) {
+    g.phase = "gameover";
+  } else {
+    g.phase = "dead";
+    g.deadTimer = 2;
+  }
+}
+
 function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) => boolean) {
+  // Fin de partida: el loop deja de procesar input y de actualizar entidades, así
+  // que el canvas queda congelado detrás del modal de GamePlayer hasta restart().
+  // (En game.js esta rama reiniciaba con Espacio; el spec lo desactiva a propósito.)
+  if (g.phase === "gameover") return;
+
+  if (g.phase === "dead") {
+    g.deadTimer -= dt;
+    g.particles.forEach((p) => p.update(dt));
+    g.particles = g.particles.filter((p) => !p.dead);
+    g.asteroids.forEach((a) => a.update(dt));
+    if (g.deadTimer <= 0) {
+      g.phase = "playing";
+      g.ship.reset();
+    }
+    return;
+  }
+
   if (pressed("Space")) g.bullets.push(...g.ship.tryShoot());
 
   g.ship.update(dt, keys);
@@ -338,6 +386,19 @@ function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) =>
   }
   g.asteroids = g.asteroids.filter((a) => !a.dead).concat(newAsteroids);
   g.bullets = g.bullets.filter((b) => !b.dead);
+
+  // Nave vs asteroide
+  if (g.ship.invincible <= 0) {
+    for (const a of g.asteroids) {
+      if (dist(g.ship, a) < g.ship.radius + a.radius * 0.82) {
+        killShip(g);
+        break;
+      }
+    }
+  }
+
+  // Nivel completado
+  if (g.asteroids.length === 0) nextLevel(g);
 }
 
 function draw(ctx: CanvasRenderingContext2D, g: GameState) {
