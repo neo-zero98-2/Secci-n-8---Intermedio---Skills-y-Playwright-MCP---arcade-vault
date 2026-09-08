@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import type { Game } from "@/lib/games";
-import AsteroidsGame from "@/components/games/AsteroidsGame";
+import AsteroidsGame, { type AsteroidsGameHandle } from "@/components/games/AsteroidsGame";
 
 export default function GamePlayer({ game }: { game: Game }) {
   const router = useRouter();
@@ -12,6 +12,7 @@ export default function GamePlayer({ game }: { game: Game }) {
 
   // Solo "rocas" tiene lógica de juego real; el resto sigue con el simulador decorativo.
   const isAsteroids = game.id === "rocas";
+  const asteroidsRef = useRef<AsteroidsGameHandle>(null);
 
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -40,7 +41,12 @@ export default function GamePlayer({ game }: { game: Game }) {
     if (!isAsteroids && score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
   }, [score, isAsteroids]);
 
-  const endGame = () => setOver(true);
+  const endGame = () => {
+    // En el juego real, el fin lo dispara el propio motor (onGameOver) para que
+    // la puntuación del modal sea la acumulada de verdad.
+    if (isAsteroids) asteroidsRef.current?.forceGameOver();
+    else setOver(true);
+  };
   const restart = () => {
     setScore(0);
     setLives(3);
@@ -48,6 +54,7 @@ export default function GamePlayer({ game }: { game: Game }) {
     setPaused(false);
     setOver(false);
     setSaved(false);
+    asteroidsRef.current?.restart();
   };
 
   return (
@@ -90,6 +97,8 @@ export default function GamePlayer({ game }: { game: Game }) {
         <div className="crt-screen">
           {isAsteroids ? (
             <AsteroidsGame
+              ref={asteroidsRef}
+              paused={paused}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setLevel}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 
 // Resolución interna fija, igual que el juego original: toda la matemática de
 // spawn, wrap y colisiones vive en este espacio de coordenadas. El canvas se
@@ -492,22 +492,42 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
 // ── Contrato con React ────────────────────────────────────────────────────────
 // Lo único que cruza la frontera React ↔ canvas. Los callbacks se emiten solo
 // cuando el valor cambia respecto al último emitido, nunca en cada frame.
+export type AsteroidsGameHandle = {
+  /** "JUGAR DE NUEVO": partida nueva desde cero. */
+  restart: () => void;
+  /** Botón "FIN": game-over inmediato con la puntuación acumulada. */
+  forceGameOver: () => void;
+};
+
 type AsteroidsGameProps = {
+  /** Botón "PAUSA": congela el loop; el último frame queda dibujado y estático. */
+  paused: boolean;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;
   onGameOver: (finalScore: number) => void;
+  ref?: Ref<AsteroidsGameHandle>;
 };
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function AsteroidsGame(props: AsteroidsGameProps) {
+export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // Los callbacks viven en un ref para que el efecto del loop no dependa de su
+  // Las props viven en un ref para que el efecto del loop no dependa de su
   // identidad: si dependiera, cada render de GamePlayer reiniciaría la partida.
-  const cbRef = useRef(props);
+  const propsRef = useRef(props);
   useEffect(() => {
-    cbRef.current = props;
+    propsRef.current = props;
   });
+  // El efecto publica aquí sus acciones; useImperativeHandle solo delega.
+  const apiRef = useRef<AsteroidsGameHandle | null>(null);
+  useImperativeHandle(
+    ref,
+    () => ({
+      restart: () => apiRef.current?.restart(),
+      forceGameOver: () => apiRef.current?.forceGameOver(),
+    }),
+    [],
+  );
   // El estado del juego vive en un ref para que el paso 9 (restart/FIN) pueda
   // alcanzarlo desde fuera del efecto.
   const gameRef = useRef<GameState | null>(null);
@@ -543,13 +563,38 @@ export default function AsteroidsGame(props: AsteroidsGameProps) {
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    let frame = 0;
-    let lastTime: number | null = null;
     // -1 fuerza una primera emisión que sincroniza el HUD con el estado real.
     const emitido = { score: -1, lives: -1, level: -1 };
     // El fin de partida se emite una sola vez por partida: manda el modal de
     // GamePlayer. Aquí no hay overlay "GAME OVER" ni reinicio con Espacio.
     let gameOverEmitido = false;
+
+    const limpiarInput = () => {
+      for (const k of Object.keys(keys)) keys[k] = false;
+      for (const k of Object.keys(justPressed)) justPressed[k] = false;
+    };
+
+    apiRef.current = {
+      restart: () => {
+        gameRef.current = createGame();
+        emitido.score = -1;
+        emitido.lives = -1;
+        emitido.level = -1;
+        gameOverEmitido = false;
+        // Sin esto, una tecla pulsada durante el modal dispararía al reanudar.
+        limpiarInput();
+      },
+      forceGameOver: () => {
+        const g = gameRef.current;
+        if (!g || g.phase === "gameover") return;
+        // Equivale a perder la última vida: mismo camino, misma puntuación.
+        g.lives = 1;
+        killShip(g);
+      },
+    };
+
+    let frame = 0;
+    let lastTime: number | null = null;
 
     const loop = (ts: number) => {
       const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
@@ -557,24 +602,25 @@ export default function AsteroidsGame(props: AsteroidsGameProps) {
 
       const g = gameRef.current;
       if (g) {
-        update(g, dt, keys, pressed);
+        // En pausa no se invoca update(dt): el último frame queda estático.
+        if (!propsRef.current.paused) update(g, dt, keys, pressed);
         draw(ctx, g);
 
         if (g.score !== emitido.score) {
           emitido.score = g.score;
-          cbRef.current.onScoreChange(g.score);
+          propsRef.current.onScoreChange(g.score);
         }
         if (g.lives !== emitido.lives) {
           emitido.lives = g.lives;
-          cbRef.current.onLivesChange(g.lives);
+          propsRef.current.onLivesChange(g.lives);
         }
         if (g.level !== emitido.level) {
           emitido.level = g.level;
-          cbRef.current.onLevelChange(g.level);
+          propsRef.current.onLevelChange(g.level);
         }
         if (g.phase === "gameover" && !gameOverEmitido) {
           gameOverEmitido = true;
-          cbRef.current.onGameOver(g.score);
+          propsRef.current.onGameOver(g.score);
         }
       }
 
@@ -583,6 +629,7 @@ export default function AsteroidsGame(props: AsteroidsGameProps) {
 
     frame = requestAnimationFrame(loop);
     return () => {
+      apiRef.current = null;
       cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
