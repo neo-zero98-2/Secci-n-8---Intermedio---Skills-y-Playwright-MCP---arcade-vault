@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { GAMES } from "@/lib/games";
 import type { Score, ScoresResponse } from "@/lib/scores";
+import { useSession } from "@/lib/session";
 
 // Solo ROCAS tiene partidas reales; los otros 7 juegan con un setInterval falso
 // y no escriben al ranking, así que sus pestañas quedan deshabilitadas.
 const ACTIVE_GAME_ID = "rocas";
+const ACTIVE_GAME_TITLE =
+  GAMES.find((g) => g.id === ACTIVE_GAME_ID)?.title ?? "";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -84,6 +87,45 @@ function Podium({ scores }: { scores: Score[] }) {
   );
 }
 
+// Sin autenticación real, "tu marca" significa "la mejor marca de alguien que
+// escribió tu mismo nombre". Si ese nombre no aparece en el top, no se renderiza
+// nada: es preferible a inventar un puesto.
+function YourBest({ scores, name }: { scores: Score[]; name?: string }) {
+  if (!name) return null;
+
+  const index = scores.findIndex((s) => s.player_name === name);
+  if (index === -1) return null;
+
+  const best = scores[index];
+
+  return (
+    <>
+      <div className="tr you-label">▸ TU MEJOR MARCA EN {ACTIVE_GAME_TITLE}</div>
+      <div
+        className="tr you"
+        style={{ animationDelay: `${scores.length * 50 + 50}ms` }}
+      >
+        <div className="rk" style={{ color: "var(--yellow)" }}>
+          #{String(index + 1).padStart(2, "0")}
+        </div>
+        <div className="pl" style={{ color: "var(--yellow)" }}>
+          {best.player_name}
+        </div>
+        <div
+          className="sc"
+          style={{
+            color: "var(--yellow)",
+            textShadow: "0 0 6px rgba(245,255,0,0.5)",
+          }}
+        >
+          {best.score.toLocaleString("es-ES")}
+        </div>
+        <div className="dt">{formatDate(best.created_at)}</div>
+      </div>
+    </>
+  );
+}
+
 function HallEmpty() {
   return (
     <div className="hall-empty">
@@ -100,6 +142,7 @@ function HallEmpty() {
 }
 
 export default function LeaderboardPage() {
+  const { user } = useSession();
   const [scores, setScores] = useState<Score[]>([]);
   const [state, setState] = useState<LoadState>("loading");
 
@@ -217,6 +260,7 @@ export default function LeaderboardPage() {
                 <div className="dt">{formatDate(s.created_at)}</div>
               </div>
             ))}
+            <YourBest scores={scores} name={user?.name} />
           </div>
         </>
       )}
