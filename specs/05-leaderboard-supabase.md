@@ -1,6 +1,6 @@
 # SPEC 05 — Leaderboard real con Supabase
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01, SPEC 04
 > **Fecha:** 2026-09-08
 > **Objetivo:** Reemplazar el ranking inventado de `/leaderboard` por uno real alimentado desde Supabase, con las tablas `games` y `scores` como primer backend del proyecto y un endpoint `/api/scores` que registra y consulta las puntuaciones reales de ROCAS.
@@ -195,40 +195,40 @@ Convenciones:
 
 ## Acceptance criteria
 
-- [ ] `npm run build` y `npm run lint` corren sin errores.
-- [ ] La tabla `games` contiene exactamente 8 filas y sus `id` coinciden uno a uno con los de `GAMES` en `lib/games.ts`.
-- [ ] La tabla `scores` queda vacía tras la migración: ninguna fila sembrada, ni de ejemplo ni de prueba.
-- [ ] Existe el índice `scores_game_id_score_idx` sobre `(game_id, score desc)`.
-- [ ] Con RLS activo, un cliente anónimo puede hacer `select` en `games` y `scores`, e `insert` en `scores`.
-- [ ] Con RLS activo, un cliente anónimo **no** puede hacer `update` ni `delete` en `scores`, ni `insert` en `games`.
-- [ ] Insertar una fila con `player_name` vacío, de más de 10 caracteres, o con `score` negativo o mayor que 10 000 000 es rechazado por la base de datos aunque se salte el endpoint.
-- [ ] `GET /api/scores?game=rocas` devuelve `{ ok: true, scores: [...] }` con como máximo 10 filas, ordenadas por `score` de mayor a menor.
-- [ ] `GET /api/scores` sin el parámetro `game`, o con un `game` que no existe en `GAMES`, responde 400 con `{ ok: false, error }`.
-- [ ] `POST /api/scores` con un cuerpo válido inserta la fila y el `GET` posterior ya la devuelve.
-- [ ] `POST /api/scores` responde 400 y no inserta nada cuando el juego no existe, el nombre queda vacío tras recortar espacios, el nombre supera 10 caracteres, o `score` no es un entero dentro del rango.
-- [ ] En `/leaderboard` la pestaña ROCAS aparece seleccionada por defecto.
-- [ ] Las otras 7 pestañas están atenuadas, marcadas como "PRÓXIMAMENTE" y no responden al click.
-- [ ] Con `scores` vacía, `/leaderboard` muestra el bloque "AÚN NO HAY MARCAS REGISTRADAS · SÉ EL PRIMERO" con enlace a `/games/rocas/play`, y no dibuja podio ni tabla.
-- [ ] Con exactamente 1 marca se dibuja solo el escalón de oro; con 2, oro y plata; con 3 o más, el podio completo.
-- [ ] La tabla nunca muestra más de 10 filas.
-- [ ] Los rangos son consecutivos empezando en `#01` y se derivan del orden de las filas, no de un valor guardado.
-- [ ] La fecha de cada fila se muestra como `dd/mm/aaaa` a partir de `created_at`.
-- [ ] Mientras la petición está en curso, la pantalla muestra un estado de carga en vez de una tabla vacía.
-- [ ] Si `GET /api/scores` falla, la pantalla muestra un mensaje de error visible en vez de un salón vacío silencioso.
-- [ ] Con sesión iniciada y al menos una marca a ese nombre, aparece la fila "TU MEJOR MARCA" con el puesto real de esa marca.
-- [ ] Sin sesión iniciada, o con una sesión cuyo nombre no tiene ninguna marca, la fila "TU MEJOR MARCA" no se renderiza.
-- [ ] `/games/rocas` muestra en la barra lateral el mismo top 10 real que `/leaderboard`, sin nombres inventados.
-- [ ] `/games/rocas` muestra en "Mejor global" la puntuación más alta real de `scores`, o "———" si no hay ninguna marca.
-- [ ] Las pantallas de detalle de los otros 7 juegos muestran el bloque vacío en la barra lateral, conservando el layout de dos columnas, y siguen mostrando su `game.best` decorativo.
-- [ ] Ninguna pantalla consulta la tabla `scores` directamente: el cliente de Supabase aparece únicamente en `app/api/scores/route.ts`.
-- [ ] La pantalla de detalle construye la URL absoluta del `fetch` a partir de `headers()`, sin ninguna variable de entorno nueva.
-- [ ] Guardar una marca nueva y recargar `/leaderboard` o `/games/rocas` la muestra de inmediato, sin respuesta cacheada.
-- [ ] Terminar una partida de ROCAS y pulsar "GUARDAR PUNTUACIÓN" inserta una fila en `scores` con el nombre y la puntuación reales de esa partida.
-- [ ] Mientras ese guardado está en curso el botón queda deshabilitado, y si el `POST` falla se muestra un error con opción de reintentar.
-- [ ] Guardar una puntuación de ROCAS **no** escribe nada en `av_scores` de `localStorage`.
-- [ ] Terminar y guardar una partida de cualquiera de los otros 7 juegos sigue escribiendo en `av_scores` y **no** crea ninguna fila en `scores`.
-- [ ] El archivo `lib/leaderboard.ts` no existe y `grep -r "seededScores\|lib/leaderboard"` no devuelve resultados en el código de la aplicación.
-- [ ] Ninguna pantalla muestra nombres de jugador o puntuaciones que no provengan de la tabla `scores`.
+- [x] `npm run build` y `npm run lint` corren sin errores.
+- [x] La tabla `games` contiene exactamente 8 filas y sus `id` coinciden uno a uno con los de `GAMES` en `lib/games.ts`.
+- [x] La tabla `scores` queda vacía tras la migración: ninguna fila sembrada, ni de ejemplo ni de prueba.
+- [x] Existe el índice `scores_game_id_score_idx` sobre `(game_id, score desc)`.
+- [x] Con RLS activo, un cliente anónimo puede hacer `select` en `games` y `scores`, e `insert` en `scores`.
+- [x] Con RLS activo, un cliente anónimo **no** puede hacer `update` ni `delete` en `scores`, ni `insert` en `games`.
+- [x] Insertar una fila con `player_name` vacío, de más de 10 caracteres, o con `score` negativo o mayor que 10 000 000 es rechazado por la base de datos aunque se salte el endpoint.
+- [x] `GET /api/scores?game=rocas` devuelve `{ ok: true, scores: [...] }` con como máximo 10 filas, ordenadas por `score` de mayor a menor.
+- [x] `GET /api/scores` sin el parámetro `game`, o con un `game` que no existe en `GAMES`, responde 400 con `{ ok: false, error }`.
+- [x] `POST /api/scores` con un cuerpo válido inserta la fila y el `GET` posterior ya la devuelve.
+- [x] `POST /api/scores` responde 400 y no inserta nada cuando el juego no existe, el nombre queda vacío tras recortar espacios, el nombre supera 10 caracteres, o `score` no es un entero dentro del rango.
+- [x] En `/leaderboard` la pestaña ROCAS aparece seleccionada por defecto.
+- [x] Las otras 7 pestañas están atenuadas, marcadas como "PRÓXIMAMENTE" y no responden al click.
+- [x] Con `scores` vacía, `/leaderboard` muestra el bloque "AÚN NO HAY MARCAS REGISTRADAS · SÉ EL PRIMERO" con enlace a `/games/rocas/play`, y no dibuja podio ni tabla.
+- [x] Con exactamente 1 marca se dibuja solo el escalón de oro; con 2, oro y plata; con 3 o más, el podio completo.
+- [x] La tabla nunca muestra más de 10 filas.
+- [x] Los rangos son consecutivos empezando en `#01` y se derivan del orden de las filas, no de un valor guardado.
+- [x] La fecha de cada fila se muestra como `dd/mm/aaaa` a partir de `created_at`.
+- [x] Mientras la petición está en curso, la pantalla muestra un estado de carga en vez de una tabla vacía.
+- [x] Si `GET /api/scores` falla, la pantalla muestra un mensaje de error visible en vez de un salón vacío silencioso.
+- [x] Con sesión iniciada y al menos una marca a ese nombre, aparece la fila "TU MEJOR MARCA" con el puesto real de esa marca.
+- [x] Sin sesión iniciada, o con una sesión cuyo nombre no tiene ninguna marca, la fila "TU MEJOR MARCA" no se renderiza.
+- [x] `/games/rocas` muestra en la barra lateral el mismo top 10 real que `/leaderboard`, sin nombres inventados.
+- [x] `/games/rocas` muestra en "Mejor global" la puntuación más alta real de `scores`, o "———" si no hay ninguna marca.
+- [x] Las pantallas de detalle de los otros 7 juegos muestran el bloque vacío en la barra lateral, conservando el layout de dos columnas, y siguen mostrando su `game.best` decorativo.
+- [x] Ninguna pantalla consulta la tabla `scores` directamente: el cliente de Supabase aparece únicamente en `app/api/scores/route.ts`.
+- [x] La pantalla de detalle construye la URL absoluta del `fetch` a partir de `headers()`, sin ninguna variable de entorno nueva.
+- [x] Guardar una marca nueva y recargar `/leaderboard` o `/games/rocas` la muestra de inmediato, sin respuesta cacheada.
+- [x] Terminar una partida de ROCAS y pulsar "GUARDAR PUNTUACIÓN" inserta una fila en `scores` con el nombre y la puntuación reales de esa partida.
+- [x] Mientras ese guardado está en curso el botón queda deshabilitado, y si el `POST` falla se muestra un error con opción de reintentar.
+- [x] Guardar una puntuación de ROCAS **no** escribe nada en `av_scores` de `localStorage`.
+- [x] Terminar y guardar una partida de cualquiera de los otros 7 juegos sigue escribiendo en `av_scores` y **no** crea ninguna fila en `scores`.
+- [x] El archivo `lib/leaderboard.ts` no existe y `grep -r "seededScores\|lib/leaderboard"` no devuelve resultados en el código de la aplicación.
+- [~] Ninguna pantalla muestra nombres de jugador o puntuaciones que no provengan de la tabla `scores`. **Cumplido con excepción:** se retiró el bloque `TOP JUGADORES · HOY` de la home, pero su tarjeta `ÚLTIMAS PUNTUACIONES` sigue mostrando actividad inventada. Decisión explícita del usuario durante la implementación: la home no estaba en el alcance de esta spec y SPEC 02 la dejó decorativa a propósito. Queda para un spec futuro.
 
 ## Decisions
 
