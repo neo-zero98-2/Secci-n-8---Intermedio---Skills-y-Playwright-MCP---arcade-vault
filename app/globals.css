@@ -974,6 +974,10 @@ a { color: inherit; text-decoration: none; }
 }
 .hall-empty p { margin: 0; font-size: 11px; color: var(--ink-dim); letter-spacing: 0.14em; line-height: 1.9; }
 .hall-empty .sep { color: var(--ink-faint); }
+/* variante para la barra lateral del detalle, más estrecha que el salón */
+.hall-empty.compact { padding: 28px 16px; gap: 16px; margin-top: 18px; border: none; background: none; }
+.hall-empty.compact::before { inset: 0; }
+.hall-empty.compact p { font-size: 10px; line-height: 2; }
 .hall-empty .call { color: var(--yellow); text-shadow: 0 0 10px rgba(245,255,0,0.45); }
 
 /* estados de carga y error del salón: la pantalla ahora depende de la red */

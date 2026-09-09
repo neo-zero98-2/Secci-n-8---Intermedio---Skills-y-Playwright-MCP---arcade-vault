@@ -48,3 +48,4 @@ necesito que siempre ejecutes la skill /frontend-design para diseñar interfacez
 
 ## mcp 
 necesito que si vas a probar un cambio y vayas a hacer una comprobación uses el mcp de playwright
+En caso dado de que necesites usar el mcp de supabase usalo
