@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import type { Game } from "@/lib/games";
+import type { SubmitScoreResponse } from "@/lib/scores";
 import AsteroidsGame, { type AsteroidsGameHandle } from "@/components/games/AsteroidsGame";
+
+type SaveState = "idle" | "saving" | "error";
 
 export default function GamePlayer({ game }: { game: Game }) {
   const router = useRouter();
@@ -21,6 +24,7 @@ export default function GamePlayer({ game }: { game: Game }) {
   const [over, setOver] = useState(false);
   const [name, setName] = useState("INVITADO");
   const [saved, setSaved] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   useEffect(() => {
     // Sincroniza con la sesión (se hidrata async desde localStorage tras el primer render).
@@ -54,7 +58,36 @@ export default function GamePlayer({ game }: { game: Game }) {
     setPaused(false);
     setOver(false);
     setSaved(false);
+    setSaveState("idle");
     asteroidsRef.current?.restart();
+  };
+
+  // Solo ROCAS escribe al ranking real; los otros 7 generan su puntuación con un
+  // setInterval falso y llenarían la tabla de basura, así que siguen en localStorage.
+  const submitScore = async () => {
+    if (!isAsteroids) {
+      saveScore({ game: game.id, score, name });
+      setSaved(true);
+      return;
+    }
+
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game_id: game.id, player_name: name, score }),
+      });
+      const data = (await res.json()) as SubmitScoreResponse;
+      if (!data.ok) {
+        setSaveState("error");
+        return;
+      }
+      setSaved(true);
+      setSaveState("idle");
+    } catch {
+      setSaveState("error");
+    }
   };
 
   return (
@@ -153,22 +186,46 @@ export default function GamePlayer({ game }: { game: Game }) {
             <div className="final-label">PUNTUACIÓN FINAL</div>
             <div className="final">{score.toLocaleString("es-ES")}</div>
             {!saved ? (
-              <div className="input-row">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 10))}
-                  placeholder="TUS INICIALES"
-                />
-                <button
-                  className="btn yellow"
-                  onClick={() => {
-                    saveScore({ game: game.id, score, name });
-                    setSaved(true);
-                  }}
-                >
-                  GUARDAR PUNTUACIÓN
-                </button>
-              </div>
+              <>
+                <div className="input-row">
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 10))}
+                    placeholder="TUS INICIALES"
+                    disabled={saveState === "saving"}
+                  />
+                  <button
+                    className="btn yellow"
+                    onClick={submitScore}
+                    disabled={saveState === "saving" || name.trim() === ""}
+                  >
+                    {saveState === "saving" ? (
+                      <>
+                        <span
+                          className="spinner"
+                          style={{ marginRight: 8, verticalAlign: "-3px" }}
+                        />
+                        GUARDANDO…
+                      </>
+                    ) : (
+                      "GUARDAR PUNTUACIÓN"
+                    )}
+                  </button>
+                </div>
+                {saveState === "error" && (
+                  <p
+                    className="pixel"
+                    style={{
+                      color: "var(--magenta)",
+                      fontSize: 10,
+                      letterSpacing: "0.06em",
+                      margin: "12px 0 0",
+                    }}
+                  >
+                    ⚠ NO SE PUDO GUARDAR LA PUNTUACIÓN. INTÉNTALO DE NUEVO.
+                  </p>
+                )}
+              </>
             ) : (
               <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
             )}
