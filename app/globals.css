@@ -359,7 +359,23 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
 }
 .chip.active { color: var(--magenta); border-color: var(--magenta); box-shadow: 0 0 10px rgba(255,0,110,0.35); }
-.chip:hover:not(.active) { color: var(--ink); }
+.chip:hover:not(.active):not(:disabled) { color: var(--ink); }
+/* Cabina todavía sin enchufar: sin brillo, con su placa de aviso. */
+.chip:disabled {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  border-color: var(--line-2);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+.chip:disabled .soon {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  color: var(--ink-faint);
+  opacity: 0.75;
+}
 
 /* ===== grid + cards ===== */
 .av-grid {
@@ -930,6 +946,18 @@ a { color: inherit; text-decoration: none; }
 .podium-slot .name { font-family: var(--pixel); font-size: 12px; margin-top: 8px; letter-spacing: 0.06em; }
 .podium-slot .score { font-family: var(--pixel); font-size: 16px; color: var(--cyan); margin-top: 8px; text-shadow: 0 0 8px rgba(0,245,255,0.5); }
 .podium-slot .date { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 6px; letter-spacing: 0.12em; }
+
+/* estados de carga y error del salón: la pantalla ahora depende de la red */
+.hall-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 56px 24px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.hall-state p { margin: 0; }
 
 .hall-table {
   border: 1px solid var(--line);
