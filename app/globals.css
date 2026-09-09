@@ -926,6 +926,10 @@ a { color: inherit; text-decoration: none; }
   align-items: end;
 }
 @media (max-width: 720px) { .podium { grid-template-columns: 1fr; } }
+/* podio parcial: con 1 marca solo hay oro, con 2 oro y plata */
+.podium.solo { grid-template-columns: minmax(0, 340px); justify-content: center; }
+.podium.duo { grid-template-columns: 1.2fr 1fr; max-width: 720px; margin-inline: auto; }
+@media (max-width: 720px) { .podium.duo { grid-template-columns: 1fr; } }
 .podium-slot {
   position: relative;
   border: 1px solid var(--line);
@@ -946,6 +950,31 @@ a { color: inherit; text-decoration: none; }
 .podium-slot .name { font-family: var(--pixel); font-size: 12px; margin-top: 8px; letter-spacing: 0.06em; }
 .podium-slot .score { font-family: var(--pixel); font-size: 16px; color: var(--cyan); margin-top: 8px; text-shadow: 0 0 8px rgba(0,245,255,0.5); }
 .podium-slot .date { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 6px; letter-spacing: 0.12em; }
+
+/* nadie ha jugado todavía: el salón lo dice en vez de inventarlo */
+.hall-empty {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 48px 24px;
+  max-width: 680px;
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  text-align: center;
+}
+.hall-empty::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px dashed rgba(245,255,0,0.16);
+  pointer-events: none;
+}
+.hall-empty p { margin: 0; font-size: 11px; color: var(--ink-dim); letter-spacing: 0.14em; line-height: 1.9; }
+.hall-empty .sep { color: var(--ink-faint); }
+.hall-empty .call { color: var(--yellow); text-shadow: 0 0 10px rgba(245,255,0,0.45); }
 
 /* estados de carga y error del salón: la pantalla ahora depende de la red */
 .hall-state {

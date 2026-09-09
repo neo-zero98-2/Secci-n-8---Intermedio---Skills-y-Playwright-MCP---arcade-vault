@@ -19,6 +19,86 @@ function formatDate(iso: string) {
   });
 }
 
+// Solo se dibujan los escalones que tienen dueño: 1 marca es oro a solas,
+// 2 son oro y plata. Un podio con huecos "———" enseñaría el esqueleto de un
+// dato que no existe.
+function PodiumSlot({ score, place }: { score: Score; place: 1 | 2 | 3 }) {
+  const tier = place === 1 ? "gold" : place === 2 ? "silver" : "bronze";
+  const champion = place === 1;
+
+  return (
+    <div className={`podium-slot ${tier}`}>
+      {champion && (
+        <div
+          className="pixel"
+          style={{
+            fontSize: 9,
+            color: "var(--gold)",
+            letterSpacing: "0.18em",
+          }}
+        >
+          CAMPEÓN
+        </div>
+      )}
+      <div
+        className="rank-num"
+        style={champion ? { fontSize: 36, marginTop: 4 } : undefined}
+      >
+        {String(place).padStart(2, "0")}
+      </div>
+      <div className="name">{score.player_name}</div>
+      <div className="score" style={champion ? { fontSize: 20 } : undefined}>
+        {score.score.toLocaleString("es-ES")}
+      </div>
+      <div className="date">{formatDate(score.created_at)}</div>
+    </div>
+  );
+}
+
+function Podium({ scores }: { scores: Score[] }) {
+  const [first, second, third] = scores;
+
+  if (scores.length === 1) {
+    return (
+      <div className="podium solo">
+        <PodiumSlot score={first} place={1} />
+      </div>
+    );
+  }
+
+  if (scores.length === 2) {
+    return (
+      <div className="podium duo">
+        <PodiumSlot score={first} place={1} />
+        <PodiumSlot score={second} place={2} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="podium">
+      <PodiumSlot score={second} place={2} />
+      <PodiumSlot score={first} place={1} />
+      <PodiumSlot score={third} place={3} />
+    </div>
+  );
+}
+
+function HallEmpty() {
+  return (
+    <div className="hall-empty">
+      <p className="pixel">
+        AÚN NO HAY MARCAS REGISTRADAS
+        <span className="sep"> · </span>
+        <span className="call">SÉ EL PRIMERO</span>
+      </p>
+      <Link href="/games/rocas/play" className="btn yellow">
+        ▶ JUGAR A ROCAS
+      </Link>
+    </div>
+  );
+}
+
 export default function LeaderboardPage() {
   const [scores, setScores] = useState<Score[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -103,30 +183,42 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      {state === "ready" && (
-        <div className="hall-table">
-          <div className="th">
-            <div>RANGO</div>
-            <div>JUGADOR</div>
-            <div>PUNTUACIÓN</div>
-            <div>FECHA</div>
-          </div>
-          {scores.map((s, i) => (
-            <div
-              key={s.id}
-              className={
-                "tr" +
-                (i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : "")
-              }
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
-              <div className="pl">{s.player_name}</div>
-              <div className="sc">{s.score.toLocaleString("es-ES")}</div>
-              <div className="dt">{formatDate(s.created_at)}</div>
+      {state === "ready" && scores.length === 0 && <HallEmpty />}
+
+      {state === "ready" && scores.length > 0 && (
+        <>
+          <Podium scores={scores} />
+
+          <div className="hall-table">
+            <div className="th">
+              <div>RANGO</div>
+              <div>JUGADOR</div>
+              <div>PUNTUACIÓN</div>
+              <div>FECHA</div>
             </div>
-          ))}
-        </div>
+            {scores.map((s, i) => (
+              <div
+                key={s.id}
+                className={
+                  "tr" +
+                  (i === 0
+                    ? " top1"
+                    : i === 1
+                      ? " top2"
+                      : i === 2
+                        ? " top3"
+                        : "")
+                }
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
+                <div className="pl">{s.player_name}</div>
+                <div className="sc">{s.score.toLocaleString("es-ES")}</div>
+                <div className="dt">{formatDate(s.created_at)}</div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <div style={{ textAlign: "center", marginTop: 32 }}>
