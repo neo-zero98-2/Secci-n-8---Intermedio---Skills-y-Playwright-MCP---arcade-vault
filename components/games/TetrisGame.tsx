@@ -165,11 +165,14 @@ function merge(g: GameState) {
       if (shape[r][c]) g.board[y + r][x + c] = shape[r][c];
 }
 
-// `next` pasa a ser la pieza en juego y se sortea la siguiente. La detección de
-// fin de partida (la pieza nueva no cabe al entrar) llega en el paso 10.
+// `next` pasa a ser la pieza en juego y se sortea la siguiente. Que la pieza
+// nueva no quepa al entrar es el fin de la partida; el loop se encarga de
+// avisar a React una sola vez.
 function spawn(g: GameState) {
   g.current = g.next;
   g.next = randomPiece();
+  if (collide(g.board, g.current.shape, g.current.x, g.current.y))
+    g.gameOver = true;
 }
 
 // Las filas completas se borran de abajo arriba; `r++` compensa el splice para
@@ -470,6 +473,12 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
     };
     window.addEventListener("keydown", onKeyDown);
 
+    // Los callbacks se emiten solo cuando el valor cambia respecto al último
+    // emitido, nunca en cada frame. Este juego no tiene vidas: no emite
+    // `onLivesChange`.
+    const emitido = { score: -1, level: -1 };
+    let gameOverEmitido = false;
+
     let frame = 0;
     // `lastTime` se refresca en cada frame, también en pausa: si no, al reanudar
     // llegaría un delta de varios segundos y la pieza bajaría de golpe.
@@ -485,6 +494,19 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
         // el último frame queda estático detrás del modal de GamePlayer.
         if (!propsRef.current.paused && !g.gameOver) update(g, dt);
         draw(ctx, g);
+
+        if (g.score !== emitido.score) {
+          emitido.score = g.score;
+          propsRef.current.onScoreChange(g.score);
+        }
+        if (g.level !== emitido.level) {
+          emitido.level = g.level;
+          propsRef.current.onLevelChange(g.level);
+        }
+        if (g.gameOver && !gameOverEmitido) {
+          gameOverEmitido = true;
+          propsRef.current.onGameOver(g.score);
+        }
       }
 
       frame = requestAnimationFrame(loop);
