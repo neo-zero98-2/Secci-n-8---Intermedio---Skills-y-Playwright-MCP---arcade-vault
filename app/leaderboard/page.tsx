@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { GAMES } from "@/lib/games";
+import { GAMES, type Game } from "@/lib/games";
 import type { Score, ScoresResponse } from "@/lib/scores";
 import { useSession } from "@/lib/session";
+import { GAME_ENGINES, getGameEngine } from "@/components/games/registry";
 
-// Solo ROCAS tiene partidas reales; los otros 7 juegan con un setInterval falso
-// y no escriben al ranking, así que sus pestañas quedan deshabilitadas.
-const ACTIVE_GAME_ID = "rocas";
-const ACTIVE_GAME_TITLE =
-  GAMES.find((g) => g.id === ACTIVE_GAME_ID)?.title ?? "";
+// Solo los juegos con motor real tienen partidas de verdad; los demás juegan con
+// un setInterval falso y no escriben al ranking, así que sus pestañas quedan
+// deshabilitadas. El registro de motores es quien lo decide.
+const DEFAULT_GAME_ID = Object.keys(GAME_ENGINES)[0];
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -90,7 +90,15 @@ function Podium({ scores }: { scores: Score[] }) {
 // Sin autenticación real, "tu marca" significa "la mejor marca de alguien que
 // escribió tu mismo nombre". Si ese nombre no aparece en el top, no se renderiza
 // nada: es preferible a inventar un puesto.
-function YourBest({ scores, name }: { scores: Score[]; name?: string }) {
+function YourBest({
+  scores,
+  name,
+  gameTitle,
+}: {
+  scores: Score[];
+  name?: string;
+  gameTitle: string;
+}) {
   if (!name) return null;
 
   const index = scores.findIndex((s) => s.player_name === name);
@@ -100,7 +108,7 @@ function YourBest({ scores, name }: { scores: Score[]; name?: string }) {
 
   return (
     <>
-      <div className="tr you-label">▸ TU MEJOR MARCA EN {ACTIVE_GAME_TITLE}</div>
+      <div className="tr you-label">▸ TU MEJOR MARCA EN {gameTitle}</div>
       <div
         className="tr you"
         style={{ animationDelay: `${scores.length * 50 + 50}ms` }}
@@ -126,7 +134,7 @@ function YourBest({ scores, name }: { scores: Score[]; name?: string }) {
   );
 }
 
-function HallEmpty() {
+function HallEmpty({ game }: { game: Game }) {
   return (
     <div className="hall-empty">
       <p className="pixel">
@@ -134,8 +142,8 @@ function HallEmpty() {
         <span className="sep"> · </span>
         <span className="call">SÉ EL PRIMERO</span>
       </p>
-      <Link href="/games/rocas/play" className="btn yellow">
-        ▶ JUGAR A ROCAS
+      <Link href={`/games/${game.id}/play`} className="btn yellow">
+        ▶ JUGAR A {game.title}
       </Link>
     </div>
   );
@@ -143,12 +151,19 @@ function HallEmpty() {
 
 export default function LeaderboardPage() {
   const { user } = useSession();
+  const [selected, setSelected] = useState(DEFAULT_GAME_ID);
   const [scores, setScores] = useState<Score[]>([]);
   const [state, setState] = useState<LoadState>("loading");
 
-  const load = useCallback(async () => {
+  // El juego seleccionado siempre existe en la biblioteca: el registro solo
+  // declara motores para ids de `GAMES`.
+  const selectedGame = GAMES.find((g) => g.id === selected)!;
+
+  // `load` recibe el id como parámetro para que el efecto dependa solo de la
+  // pestaña seleccionada: una petición por cambio de pestaña, ni una más.
+  const load = useCallback(async (gameId: string) => {
     try {
-      const res = await fetch(`/api/scores?game=${ACTIVE_GAME_ID}`, {
+      const res = await fetch(`/api/scores?game=${gameId}`, {
         cache: "no-store",
       });
       const data = (await res.json()) as ScoresResponse;
@@ -164,15 +179,17 @@ export default function LeaderboardPage() {
   }, []);
 
   useEffect(() => {
-    // Carga inicial contra la red (sistema externo). El estado se actualiza al
-    // resolverse la petición, no de forma síncrona.
+    // Carga contra la red (sistema externo) al montar y en cada cambio de
+    // pestaña. El estado se actualiza al resolverse la petición, no de forma
+    // síncrona.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    setState("loading");
+    load(selected);
+  }, [load, selected]);
 
   const retry = () => {
     setState("loading");
-    load();
+    load(selected);
   };
 
   return (
@@ -186,8 +203,13 @@ export default function LeaderboardPage() {
 
       <div className="hall-tabs">
         {GAMES.map((g) =>
-          g.id === ACTIVE_GAME_ID ? (
-            <button key={g.id} className="chip active" aria-current="true">
+          getGameEngine(g.id) ? (
+            <button
+              key={g.id}
+              className={"chip" + (g.id === selected ? " active" : "")}
+              aria-current={g.id === selected ? "true" : undefined}
+              onClick={() => setSelected(g.id)}
+            >
               {g.title}
             </button>
           ) : (
@@ -226,7 +248,9 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      {state === "ready" && scores.length === 0 && <HallEmpty />}
+      {state === "ready" && scores.length === 0 && (
+        <HallEmpty game={selectedGame} />
+      )}
 
       {state === "ready" && scores.length > 0 && (
         <>
@@ -260,7 +284,11 @@ export default function LeaderboardPage() {
                 <div className="dt">{formatDate(s.created_at)}</div>
               </div>
             ))}
-            <YourBest scores={scores} name={user?.name} />
+            <YourBest
+              scores={scores}
+              name={user?.name}
+              gameTitle={selectedGame.title}
+            />
           </div>
         </>
       )}
