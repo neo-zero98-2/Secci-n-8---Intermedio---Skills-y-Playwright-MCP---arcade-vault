@@ -113,6 +113,27 @@ export default async function GameDetailPage({ params }: Props) {
               VOLVER AL VAULT
             </Link>
           </div>
+
+          {/* Solo los juegos que se juegan de verdad declaran sus controles. */}
+          {game.controls && (
+            <section className="controls-card" aria-labelledby="controles">
+              <h3 id="controles">CONTROLES</h3>
+              <dl className="controls-list">
+                {game.controls.map((c) => (
+                  <div className="control-row" key={c.action}>
+                    <dt>
+                      {c.keys.map((k) => (
+                        <kbd className="keycap" key={k}>
+                          {k}
+                        </kbd>
+                      ))}
+                    </dt>
+                    <dd>{c.action}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
         </div>
       </div>
 

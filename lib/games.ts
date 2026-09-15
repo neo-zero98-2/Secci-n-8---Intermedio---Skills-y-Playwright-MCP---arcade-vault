@@ -1,5 +1,13 @@
 export type GameCategory = "ARCADE" | "PUZZLE" | "SHOOTER" | "VERSUS";
 
+// Placa de instrucciones de la máquina: una tecla (o varias que hacen lo mismo)
+// y lo que provoca. Opcional en `Game`: solo lo declaran los juegos que se
+// juegan de verdad, para no inventar controles a los que aún son decorativos.
+export type GameControl = {
+  keys: string[]; // glifos ya listos para pintar, p. ej. ["←", "→"]
+  action: string;
+};
+
 export type Game = {
   id: string;
   title: string;
@@ -10,6 +18,7 @@ export type Game = {
   color: "cyan" | "magenta" | "yellow" | "green";
   best: number;
   plays: string;
+  controls?: GameControl[];
 };
 
 export const GAMES: Game[] = [
@@ -34,6 +43,12 @@ export const GAMES: Game[] = [
     color: "magenta",
     best: 184220,
     plays: "31.8K",
+    controls: [
+      { keys: ["←", "→"], action: "Mover la pieza de lado" },
+      { keys: ["↑", "X"], action: "Rotar en sentido horario" },
+      { keys: ["↓"], action: "Bajar una fila (+1 punto)" },
+      { keys: ["Espacio"], action: "Caída instantánea (+2 puntos por celda)" },
+    ],
   },
   {
     id: "serpentina",
