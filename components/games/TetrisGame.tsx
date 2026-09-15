@@ -455,16 +455,33 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
 
     gameRef.current = createGame();
 
+    // Los callbacks se emiten solo cuando el valor cambia respecto al último
+    // emitido, nunca en cada frame. Este juego no tiene vidas: no emite
+    // `onLivesChange`.
+    const emitido = { score: -1, level: -1 };
+    let gameOverEmitido = false;
+
     apiRef.current = {
+      // "JUGAR DE NUEVO": partida limpia. Resetear la caché a -1 fuerza a
+      // reemitir 0 puntos y nivel 1, y bajar el flag permite que el siguiente
+      // fin de partida vuelva a abrir el modal.
       restart: () => {
         gameRef.current = createGame();
+        emitido.score = -1;
+        emitido.level = -1;
+        gameOverEmitido = false;
       },
+      // Botón "FIN": el mismo camino que llenar el tablero. El loop deja de
+      // actualizar y emite onGameOver con la puntuación acumulada.
       forceGameOver: () => {
         const g = gameRef.current;
         if (g) g.gameOver = true;
       },
     };
 
+    // No hay mapa de teclas pulsadas que limpiar: cada keydown se atiende una
+    // vez y el listener ignora todo mientras hay pausa o fin de partida, así
+    // que una tecla mantenida durante el modal no arrastra efecto al reiniciar.
     const onKeyDown = (e: KeyboardEvent) => {
       if (GAME_KEYS.has(e.code)) e.preventDefault();
       const g = gameRef.current;
@@ -472,12 +489,6 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
       handleKey(g, e.code);
     };
     window.addEventListener("keydown", onKeyDown);
-
-    // Los callbacks se emiten solo cuando el valor cambia respecto al último
-    // emitido, nunca en cada frame. Este juego no tiene vidas: no emite
-    // `onLivesChange`.
-    const emitido = { score: -1, level: -1 };
-    let gameOverEmitido = false;
 
     let frame = 0;
     // `lastTime` se refresca en cada frame, también en pausa: si no, al reanudar
