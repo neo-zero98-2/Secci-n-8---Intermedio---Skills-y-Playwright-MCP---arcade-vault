@@ -125,6 +125,46 @@ function randomPiece(): Piece {
   };
 }
 
+// `collide` va parametrizada por el tablero en vez de leer un global: el estado
+// vive dentro del efecto y un remount no debe compartirlo.
+function collide(
+  board: number[][],
+  shape: number[][],
+  ox: number,
+  oy: number,
+): boolean {
+  for (let r = 0; r < shape.length; r++) {
+    for (let c = 0; c < shape[r].length; c++) {
+      if (!shape[r][c]) continue;
+      const nx = ox + c;
+      const ny = oy + r;
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && board[ny][nx]) return true;
+    }
+  }
+  return false;
+}
+
+function merge(g: GameState) {
+  const { shape, x, y } = g.current;
+  for (let r = 0; r < shape.length; r++)
+    for (let c = 0; c < shape[r].length; c++)
+      if (shape[r][c]) g.board[y + r][x + c] = shape[r][c];
+}
+
+// `next` pasa a ser la pieza en juego y se sortea la siguiente. La detección de
+// fin de partida (la pieza nueva no cabe al entrar) llega en el paso 10.
+function spawn(g: GameState) {
+  g.current = g.next;
+  g.next = randomPiece();
+}
+
+// La limpieza de líneas y su puntuación entran en el paso 8.
+function lockPiece(g: GameState) {
+  merge(g);
+  spawn(g);
+}
+
 function createGame(): GameState {
   // init() del original: sortea la pieza en juego y la siguiente.
   return {
@@ -142,9 +182,14 @@ function createGame(): GameState {
 
 // ── Actualización ─────────────────────────────────────────────────────────────
 function update(g: GameState, dt: number) {
-  // La gravedad y el bloqueo de piezas entran en el paso 6; de momento el loop
-  // solo hace correr el reloj del juego.
   g.dropAccum += dt;
+  if (g.dropAccum < g.dropInterval) return;
+  g.dropAccum = 0;
+  if (!collide(g.board, g.current.shape, g.current.x, g.current.y + 1)) {
+    g.current.y++;
+  } else {
+    lockPiece(g);
+  }
 }
 
 // ── Dibujo ────────────────────────────────────────────────────────────────────
