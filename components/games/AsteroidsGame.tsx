@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef } from "react";
+import type {
+  GameEngineHandle,
+  GameEngineProps,
+} from "@/components/games/registry";
 
 // Resolución interna fija, igual que el juego original: toda la matemática de
 // spawn, wrap y colisiones vive en este espacio de coordenadas. El canvas se
@@ -30,7 +34,13 @@ type Keys = Record<string, boolean>;
 
 // Teclas que el juego consume: sin preventDefault, las flechas y el espacio
 // hacen scroll de la página durante la partida.
-const GAME_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"]);
+const GAME_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Space",
+]);
 
 // ── Bullet ────────────────────────────────────────────────────────────────────
 class Bullet {
@@ -127,7 +137,8 @@ class Asteroid {
     ctx.lineJoin = "round";
     ctx.beginPath();
     ctx.moveTo(this.verts[0][0], this.verts[0][1]);
-    for (let i = 1; i < this.verts.length; i++) ctx.lineTo(this.verts[i][0], this.verts[i][1]);
+    for (let i = 1; i < this.verts.length; i++)
+      ctx.lineTo(this.verts[i][0], this.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
@@ -290,7 +301,8 @@ class Ship {
   draw(ctx: CanvasRenderingContext2D) {
     if (this.dead) return;
     // Parpadeo durante invencibilidad de reaparición
-    if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
+    if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0)
+      return;
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -402,7 +414,12 @@ function killShip(g: GameState) {
   }
 }
 
-function update(g: GameState, dt: number, keys: Keys, pressed: (code: string) => boolean) {
+function update(
+  g: GameState,
+  dt: number,
+  keys: Keys,
+  pressed: (code: string) => boolean,
+) {
   // Fin de partida: el loop deja de procesar input y de actualizar entidades, así
   // que el canvas queda congelado detrás del modal de GamePlayer hasta restart().
   // (En game.js esta rama reiniciaba con Espacio; el spec lo desactiva a propósito.)
@@ -490,27 +507,13 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
 }
 
 // ── Contrato con React ────────────────────────────────────────────────────────
-// Lo único que cruza la frontera React ↔ canvas. Los callbacks se emiten solo
-// cuando el valor cambia respecto al último emitido, nunca en cada frame.
-export type AsteroidsGameHandle = {
-  /** "JUGAR DE NUEVO": partida nueva desde cero. */
-  restart: () => void;
-  /** Botón "FIN": game-over inmediato con la puntuación acumulada. */
-  forceGameOver: () => void;
-};
-
-type AsteroidsGameProps = {
-  /** Botón "PAUSA": congela el loop; el último frame queda dibujado y estático. */
-  paused: boolean;
-  onScoreChange: (score: number) => void;
-  onLivesChange: (lives: number) => void;
-  onLevelChange: (level: number) => void;
-  onGameOver: (finalScore: number) => void;
-  ref?: Ref<AsteroidsGameHandle>;
-};
+// El contrato vive ahora en el registry de motores: es el mismo para todos los
+// juegos. Los callbacks se emiten solo cuando el valor cambia respecto al
+// último emitido, nunca en cada frame.
+export type AsteroidsGameHandle = GameEngineHandle;
 
 // ── Componente ────────────────────────────────────────────────────────────────
-export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
+export default function AsteroidsGame({ ref, ...props }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Las props viven en un ref para que el efecto del loop no dependa de su
   // identidad: si dependiera, cada render de GamePlayer reiniciaría la partida.
@@ -519,7 +522,7 @@ export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
     propsRef.current = props;
   });
   // El efecto publica aquí sus acciones; useImperativeHandle solo delega.
-  const apiRef = useRef<AsteroidsGameHandle | null>(null);
+  const apiRef = useRef<GameEngineHandle | null>(null);
   useImperativeHandle(
     ref,
     () => ({
@@ -597,7 +600,8 @@ export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
     let lastTime: number | null = null;
 
     const loop = (ts: number) => {
-      const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
+      const dt =
+        lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
       lastTime = ts;
 
       const g = gameRef.current;
@@ -612,7 +616,7 @@ export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
         }
         if (g.lives !== emitido.lives) {
           emitido.lives = g.lives;
-          propsRef.current.onLivesChange(g.lives);
+          propsRef.current.onLivesChange?.(g.lives);
         }
         if (g.level !== emitido.level) {
           emitido.level = g.level;
@@ -636,5 +640,7 @@ export default function AsteroidsGame({ ref, ...props }: AsteroidsGameProps) {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="game-canvas" width={W} height={H} />;
+  return (
+    <canvas ref={canvasRef} className="game-canvas" width={W} height={H} />
+  );
 }

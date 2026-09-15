@@ -609,6 +609,76 @@ a { color: inherit; text-decoration: none; }
 .stat-strip .v { font-family: var(--pixel); font-size: 16px; color: var(--cyan); margin-top: 6px; text-shadow: 0 0 6px rgba(0,245,255,0.5); }
 .detail-actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 
+/* ===== controles del juego (placa de instrucciones de la máquina) =====
+   Es una tabla de consulta, no una secuencia: por eso no va numerada. El cyan
+   la mantiene en la columna del juego; el magenta queda para el ranking, que
+   es la columna de la gente. */
+.controls-card {
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.controls-card h3 {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--cyan);
+  text-shadow: 0 0 8px rgba(0,245,255,0.5);
+  border-bottom: 1px solid var(--line);
+}
+.controls-list { margin: 0; }
+.control-row {
+  display: grid;
+  grid-template-columns: minmax(112px, auto) 1fr;
+  gap: 16px; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-2);
+  transition: background 0.18s ease;
+}
+.control-row:last-child { border-bottom: 0; }
+.control-row:hover { background: var(--bg-3); }
+.control-row dt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; }
+.control-row dd {
+  margin: 0;
+  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  color: var(--ink-dim);
+  transition: color 0.18s ease;
+}
+.control-row:hover dd { color: var(--ink); }
+
+/* La tecla se dibuja como una tecla: tapa con brillo arriba y canto abajo.
+   Al pasar por su fila se hunde y se enciende, que es justo lo que la fila
+   describe. Es el único movimiento del bloque. */
+.keycap {
+  display: inline-grid; place-items: center;
+  min-width: 34px; height: 34px;
+  padding: 0 9px;
+  font-family: var(--pixel); font-size: 12px; line-height: 1;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--bg-3), var(--bg));
+  border: 1px solid var(--line);
+  border-bottom-width: 3px;
+  box-shadow: inset 0 1px 0 var(--line-2);
+  transition: color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease, border-bottom-width 0.18s ease;
+}
+.control-row:hover .keycap {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  border-bottom-width: 2px;
+  box-shadow: inset 0 1px 0 var(--line-2), 0 0 10px rgba(0,245,255,0.35);
+  transform: translateY(1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .control-row, .control-row dd, .keycap { transition: none; }
+  .control-row:hover .keycap { transform: none; border-bottom-width: 3px; }
+}
+@media (max-width: 560px) {
+  .control-row { grid-template-columns: 1fr; gap: 10px; }
+}
+
 .leaderboard {
   border: 1px solid var(--line);
   background: var(--bg-2);
@@ -730,6 +800,15 @@ a { color: inherit; text-decoration: none; }
   display: block;
   width: 100%; height: 100%;
   background: #000;
+}
+
+/* Motores cuyo canvas no es 4:3 (el tablero 300x600 de CAÍDA): en vez de
+   estirarse al marco y deformar los bloques, se centra a altura completa.
+   Las franjas laterales son el fondo negro del propio .crt-screen. */
+.crt-screen.fit-height .game-canvas {
+  right: auto; left: 50%;
+  width: auto; height: 100%;
+  transform: translateX(-50%);
 }
 
 /* fake in-screen game */

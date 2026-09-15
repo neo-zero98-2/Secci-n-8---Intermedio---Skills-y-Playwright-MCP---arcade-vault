@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
 import type { Game } from "@/lib/games";
 import type { SubmitScoreResponse } from "@/lib/scores";
-import AsteroidsGame, { type AsteroidsGameHandle } from "@/components/games/AsteroidsGame";
+import {
+  getGameEngine,
+  type GameEngineHandle,
+} from "@/components/games/registry";
 
 type SaveState = "idle" | "saving" | "error";
 
@@ -13,9 +16,10 @@ export default function GamePlayer({ game }: { game: Game }) {
   const router = useRouter();
   const { user, saveScore } = useSession();
 
-  // Solo "rocas" tiene lógica de juego real; el resto sigue con el simulador decorativo.
-  const isAsteroids = game.id === "rocas";
-  const asteroidsRef = useRef<AsteroidsGameHandle>(null);
+  // El registry es el único sitio que sabe qué juegos tienen motor real; el
+  // resto de la biblioteca sigue con el simulador decorativo.
+  const engine = getGameEngine(game.id);
+  const engineRef = useRef<GameEngineHandle>(null);
 
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -33,22 +37,25 @@ export default function GamePlayer({ game }: { game: Game }) {
   }, [user]);
 
   useEffect(() => {
-    // Simulador de puntuación del prototipo: solo para los juegos sin lógica real.
-    if (over || paused || isAsteroids) return;
-    const t = setInterval(() => setScore((s) => s + Math.floor(10 + Math.random() * 90)), 220);
+    // Simulador de puntuación del prototipo: solo para los juegos sin motor real.
+    if (over || paused || engine) return;
+    const t = setInterval(
+      () => setScore((s) => s + Math.floor(10 + Math.random() * 90)),
+      220,
+    );
     return () => clearInterval(t);
-  }, [over, paused, isAsteroids]);
+  }, [over, paused, engine]);
 
   useEffect(() => {
     // Ratchet de nivel: mismo simulador que el prototipo (avanza ~cada 2500 puntos).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!isAsteroids && score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
-  }, [score, isAsteroids]);
+    if (!engine && score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
+  }, [score, engine]);
 
   const endGame = () => {
     // En el juego real, el fin lo dispara el propio motor (onGameOver) para que
     // la puntuación del modal sea la acumulada de verdad.
-    if (isAsteroids) asteroidsRef.current?.forceGameOver();
+    if (engine) engineRef.current?.forceGameOver();
     else setOver(true);
   };
   const restart = () => {
@@ -59,13 +66,14 @@ export default function GamePlayer({ game }: { game: Game }) {
     setOver(false);
     setSaved(false);
     setSaveState("idle");
-    asteroidsRef.current?.restart();
+    engineRef.current?.restart();
   };
 
-  // Solo ROCAS escribe al ranking real; los otros 7 generan su puntuación con un
-  // setInterval falso y llenarían la tabla de basura, así que siguen en localStorage.
+  // Solo los juegos con motor real escriben al ranking; los demás generan su
+  // puntuación con un setInterval falso y llenarían la tabla de basura, así que
+  // siguen en localStorage.
   const submitScore = async () => {
-    if (!isAsteroids) {
+    if (!engine) {
       saveScore({ game: game.id, score, name });
       setSaved(true);
       return;
@@ -104,10 +112,12 @@ export default function GamePlayer({ game }: { game: Game }) {
             <div className="l">Puntuación</div>
             <div className="v">{score.toLocaleString("es-ES")}</div>
           </div>
-          <div className="hud-stat lives">
-            <div className="l">Vidas</div>
-            <div className="v">{"♥ ".repeat(lives).trim() || "—"}</div>
-          </div>
+          {(!engine || engine.hasLives) && (
+            <div className="hud-stat lives">
+              <div className="l">Vidas</div>
+              <div className="v">{"♥ ".repeat(lives).trim() || "—"}</div>
+            </div>
+          )}
           <div className="hud-stat level">
             <div className="l">Nivel</div>
             <div className="v">{String(level).padStart(2, "0")}</div>
@@ -120,17 +130,22 @@ export default function GamePlayer({ game }: { game: Game }) {
           <button className="btn magenta" onClick={endGame}>
             FIN
           </button>
-          <button className="btn ghost" onClick={() => router.push(`/games/${game.id}`)}>
+          <button
+            className="btn ghost"
+            onClick={() => router.push(`/games/${game.id}`)}
+          >
             SALIR
           </button>
         </div>
       </div>
 
       <div className="crt">
-        <div className="crt-screen">
-          {isAsteroids ? (
-            <AsteroidsGame
-              ref={asteroidsRef}
+        <div
+          className={"crt-screen" + (engine?.fitHeight ? " fit-height" : "")}
+        >
+          {engine ? (
+            <engine.Component
+              ref={engineRef}
               paused={paused}
               onScoreChange={setScore}
               onLivesChange={setLives}
@@ -150,7 +165,10 @@ export default function GamePlayer({ game }: { game: Game }) {
             </div>
           )}
           {paused && (
-            <div className="crt-content" style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}>
+            <div
+              className="crt-content"
+              style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}
+            >
               <div>
                 <div className="pixel neon-yellow" style={{ fontSize: 22 }}>
                   EN PAUSA
@@ -172,9 +190,7 @@ export default function GamePlayer({ game }: { game: Game }) {
         </div>
         <div className="crt-bottom">
           <span className="led">SEÑAL OK</span>
-          <span>
-            {game.title} · CRT-83 · 60 HZ
-          </span>
+          <span>{game.title} · CRT-83 · 60 HZ</span>
           <span>CARGA · 1MB</span>
         </div>
       </div>
@@ -190,7 +206,9 @@ export default function GamePlayer({ game }: { game: Game }) {
                 <div className="input-row">
                   <input
                     value={name}
-                    onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 10))}
+                    onChange={(e) =>
+                      setName(e.target.value.toUpperCase().slice(0, 10))
+                    }
                     placeholder="TUS INICIALES"
                     disabled={saveState === "saving"}
                   />
@@ -233,7 +251,10 @@ export default function GamePlayer({ game }: { game: Game }) {
               <button className="btn" onClick={restart}>
                 JUGAR DE NUEVO
               </button>
-              <button className="btn magenta" onClick={() => router.push("/games")}>
+              <button
+                className="btn magenta"
+                onClick={() => router.push("/games")}
+              >
                 VOLVER AL VAULT
               </button>
             </div>

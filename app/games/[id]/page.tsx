@@ -4,12 +4,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { GAMES } from "@/lib/games";
 import type { Score, ScoresResponse } from "@/lib/scores";
+import { getGameEngine } from "@/components/games/registry";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
-
-const ROCAS_ID = "rocas";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-ES", {
@@ -54,9 +53,10 @@ export default async function GameDetailPage({ params }: Props) {
   if (!game) notFound();
 
   const { scores, failed } = await fetchTopScores(game.id);
-  // "Mejor global" solo deja de ser decorativo en ROCAS, donde hay marcas reales.
-  const isRocas = game.id === ROCAS_ID;
-  const bestReal = isRocas ? scores[0]?.score : undefined;
+  // "Mejor global" solo deja de ser decorativo en los juegos con motor real,
+  // los únicos que escriben marcas al ranking.
+  const hasEngine = getGameEngine(game.id) !== undefined;
+  const bestReal = hasEngine ? scores[0]?.score : undefined;
 
   return (
     <div className="av-detail fade-in">
@@ -82,9 +82,12 @@ export default async function GameDetailPage({ params }: Props) {
               <div className="l">Mejor global</div>
               <div
                 className="v"
-                style={{ color: "var(--magenta)", textShadow: "0 0 6px rgba(255,0,110,0.5)" }}
+                style={{
+                  color: "var(--magenta)",
+                  textShadow: "0 0 6px rgba(255,0,110,0.5)",
+                }}
               >
-                {isRocas
+                {hasEngine
                   ? (bestReal?.toLocaleString("es-ES") ?? "———")
                   : game.best.toLocaleString("es-ES")}
               </div>
@@ -93,7 +96,10 @@ export default async function GameDetailPage({ params }: Props) {
               <div className="l">Dificultad</div>
               <div
                 className="v"
-                style={{ color: "var(--yellow)", textShadow: "0 0 6px rgba(245,255,0,0.5)" }}
+                style={{
+                  color: "var(--yellow)",
+                  textShadow: "0 0 6px rgba(245,255,0,0.5)",
+                }}
               >
                 ★ ★ ★ ☆ ☆
               </div>
@@ -107,6 +113,27 @@ export default async function GameDetailPage({ params }: Props) {
               VOLVER AL VAULT
             </Link>
           </div>
+
+          {/* Solo los juegos que se juegan de verdad declaran sus controles. */}
+          {game.controls && (
+            <section className="controls-card" aria-labelledby="controles">
+              <h3 id="controles">CONTROLES</h3>
+              <dl className="controls-list">
+                {game.controls.map((c) => (
+                  <div className="control-row" key={c.action}>
+                    <dt>
+                      {c.keys.map((k) => (
+                        <kbd className="keycap" key={k}>
+                          {k}
+                        </kbd>
+                      ))}
+                    </dt>
+                    <dd>{c.action}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
         </div>
       </div>
 
@@ -142,7 +169,13 @@ export default async function GameDetailPage({ params }: Props) {
                 key={s.id}
                 className={
                   "lb-row" +
-                  (i === 0 ? " top1" : i === 1 ? " top2" : i === 2 ? " top3" : "")
+                  (i === 0
+                    ? " top1"
+                    : i === 1
+                      ? " top2"
+                      : i === 2
+                        ? " top3"
+                        : "")
                 }
               >
                 <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
