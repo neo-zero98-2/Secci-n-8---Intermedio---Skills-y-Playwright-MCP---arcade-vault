@@ -42,6 +42,8 @@ const COLORS = [
   "#9e9e9e", // N - tuerca (gris metálico)
 ];
 
+const LINE_SCORES = [0, 100, 300, 500, 800];
+
 const PIECES = [
   null,
   [
@@ -159,9 +161,28 @@ function spawn(g: GameState) {
   g.next = randomPiece();
 }
 
-// La limpieza de líneas y su puntuación entran en el paso 8.
+// Las filas completas se borran de abajo arriba; `r++` compensa el splice para
+// no saltarse la fila que acaba de ocupar su sitio.
+function clearLines(g: GameState) {
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (g.board[r].every((v) => v !== 0)) {
+      g.board.splice(r, 1);
+      g.board.unshift(new Array<number>(COLS).fill(0));
+      cleared++;
+      r++;
+    }
+  }
+  if (!cleared) return;
+  g.lines += cleared;
+  g.score += (LINE_SCORES[cleared] ?? 0) * g.level;
+  g.level = Math.floor(g.lines / 10) + 1;
+  g.dropInterval = Math.max(100, 1000 - (g.level - 1) * 90);
+}
+
 function lockPiece(g: GameState) {
   merge(g);
+  clearLines(g);
   spawn(g);
 }
 
@@ -329,6 +350,8 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++) drawBlock(ctx, c, r, g.board[r][c], BLOCK);
 
+  // La silueta translúcida marca dónde va a aterrizar la pieza.
+  drawPiece(ctx, g.current, ghostY(g), 0.2);
   drawPiece(ctx, g.current, g.current.y);
 }
 
