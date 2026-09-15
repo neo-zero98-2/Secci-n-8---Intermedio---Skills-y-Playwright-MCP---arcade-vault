@@ -27,12 +27,80 @@ const MAX_DT = 50;
 // no atar el canvas al tema de la página.
 const GRID_LINE = "rgba(0, 245, 255, 0.18)";
 
+// Colores y piezas del original, con sus 9 entradas: el índice 0 es nulo y los
+// 1–8 son I, O, T, S, Z, J, L y la "tuerca", una octava pieza inventada que no
+// existe en ningún Tetris y que deja un hueco imposible al asentarse.
+const COLORS = [
+  null,
+  "#4dd0e1", // I - cyan
+  "#ffd54f", // O - amarillo
+  "#ba68c8", // T - morado
+  "#81c784", // S - verde
+  "#e57373", // Z - rojo
+  "#90caf9", // J - azul pálido
+  "#ffb74d", // L - naranja
+  "#9e9e9e", // N - tuerca (gris metálico)
+];
+
+const PIECES = [
+  null,
+  [
+    [0, 0, 0, 0],
+    [1, 1, 1, 1],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+  ], // I
+  [
+    [2, 2],
+    [2, 2],
+  ], // O
+  [
+    [0, 3, 0],
+    [3, 3, 3],
+    [0, 0, 0],
+  ], // T
+  [
+    [0, 4, 4],
+    [4, 4, 0],
+    [0, 0, 0],
+  ], // S
+  [
+    [5, 5, 0],
+    [0, 5, 5],
+    [0, 0, 0],
+  ], // Z
+  [
+    [6, 0, 0],
+    [6, 6, 6],
+    [0, 0, 0],
+  ], // J
+  [
+    [0, 0, 7],
+    [7, 7, 7],
+    [0, 0, 0],
+  ], // L
+  [
+    [8, 8, 8],
+    [8, 0, 8],
+    [8, 8, 8],
+  ], // N (tuerca)
+];
+
 // ── Estado ────────────────────────────────────────────────────────────────────
 // Mutable y en un ref: el loop corre a ~60 fps y re-renderizar React a esa
 // cadencia es inviable. No hay campo `paused` (lo manda la prop del mismo
 // nombre) ni `lives` (este juego no tiene).
+type Piece = {
+  type: number; // 1–8, índice en PIECES y en COLORS
+  shape: number[][]; // matriz cuadrada, 0 = vacío
+  x: number; // columna de la esquina superior izquierda
+  y: number; // fila
+};
+
 type GameState = {
   board: number[][]; // ROWS×COLS; 0 = vacío, 1–8 = índice de color
+  current: Piece;
+  next: Piece;
   score: number;
   lines: number;
   level: number;
@@ -45,9 +113,24 @@ function createBoard(): number[][] {
   return Array.from({ length: ROWS }, () => new Array<number>(COLS).fill(0));
 }
 
+// Sorteo uniforme entre las 8 piezas, igual que el original: sin bolsa de 7.
+function randomPiece(): Piece {
+  const type = Math.floor(Math.random() * 8) + 1;
+  const shape = PIECES[type]!.map((row) => [...row]);
+  return {
+    type,
+    shape,
+    x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2),
+    y: 0,
+  };
+}
+
 function createGame(): GameState {
+  // init() del original: sortea la pieza en juego y la siguiente.
   return {
     board: createBoard(),
+    current: randomPiece(),
+    next: randomPiece(),
     score: 0,
     lines: 0,
     level: 1,
@@ -82,11 +165,45 @@ function drawGrid(ctx: CanvasRenderingContext2D) {
   }
 }
 
-// El tablero, el fantasma, el panel y la pieza actual se van sumando aquí en
-// los pasos siguientes; el orden de pintado importa y queda en un solo sitio.
-function draw(ctx: CanvasRenderingContext2D) {
+function drawBlock(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  colorIndex: number,
+  size: number,
+  alpha?: number,
+) {
+  if (!colorIndex) return;
+  ctx.globalAlpha = alpha ?? 1;
+  ctx.fillStyle = COLORS[colorIndex]!;
+  ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  // Brillo superior, igual que en el original.
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  ctx.globalAlpha = 1;
+}
+
+function drawPiece(
+  ctx: CanvasRenderingContext2D,
+  piece: Piece,
+  y: number,
+  alpha?: number,
+) {
+  for (let r = 0; r < piece.shape.length; r++)
+    for (let c = 0; c < piece.shape[r].length; c++)
+      drawBlock(ctx, piece.x + c, y + r, piece.shape[r][c], BLOCK, alpha);
+}
+
+// El fantasma y el panel se suman aquí en los pasos siguientes; el orden de
+// pintado importa y queda en un solo sitio.
+function draw(ctx: CanvasRenderingContext2D, g: GameState) {
   ctx.clearRect(0, 0, W, H);
   drawGrid(ctx);
+
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) drawBlock(ctx, c, r, g.board[r][c], BLOCK);
+
+  drawPiece(ctx, g.current, g.current.y);
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -142,7 +259,7 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
         // En pausa y tras el game over no se actualiza, pero se sigue dibujando:
         // el último frame queda estático detrás del modal de GamePlayer.
         if (!propsRef.current.paused && !g.gameOver) update(g, dt);
-        draw(ctx);
+        draw(ctx, g);
       }
 
       frame = requestAnimationFrame(loop);
