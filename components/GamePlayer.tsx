@@ -140,7 +140,9 @@ export default function GamePlayer({ game }: { game: Game }) {
       </div>
 
       <div className="crt">
-        <div className="crt-screen">
+        <div
+          className={"crt-screen" + (engine?.fitHeight ? " fit-height" : "")}
+        >
           {engine ? (
             <engine.Component
               ref={engineRef}

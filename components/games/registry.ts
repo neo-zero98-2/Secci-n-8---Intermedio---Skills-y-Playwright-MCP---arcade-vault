@@ -1,5 +1,6 @@
 import type { ComponentType, Ref } from "react";
 import AsteroidsGame from "@/components/games/AsteroidsGame";
+import TetrisGame from "@/components/games/TetrisGame";
 
 // ── Contrato de motor ─────────────────────────────────────────────────────────
 // Generalización del contrato que SPEC 04 definió para un único juego: lo único
@@ -36,6 +37,7 @@ export type GameEngine = {
 // aparecen aquí siguen con la arena decorativa y el simulador falso.
 export const GAME_ENGINES: Record<string, GameEngine> = {
   rocas: { Component: AsteroidsGame, hasLives: true, fitHeight: false },
+  caida: { Component: TetrisGame, hasLives: false, fitHeight: true },
 };
 
 export function getGameEngine(id: string): GameEngine | undefined {

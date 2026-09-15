@@ -732,6 +732,15 @@ a { color: inherit; text-decoration: none; }
   background: #000;
 }
 
+/* Motores cuyo canvas no es 4:3 (el tablero 300x600 de CAÍDA): en vez de
+   estirarse al marco y deformar los bloques, se centra a altura completa.
+   Las franjas laterales son el fondo negro del propio .crt-screen. */
+.crt-screen.fit-height .game-canvas {
+  right: auto; left: 50%;
+  width: auto; height: 100%;
+  transform: translateX(-50%);
+}
+
 /* fake in-screen game */
 .game-arena {
   position: absolute; inset: 0;
