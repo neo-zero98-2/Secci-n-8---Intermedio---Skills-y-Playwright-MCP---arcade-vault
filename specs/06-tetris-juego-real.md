@@ -1,6 +1,6 @@
 # SPEC 06 — Tetris real en el slot "CAÍDA"
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01, SPEC 04, SPEC 05
 > **Fecha:** 2026-09-14
 > **Objetivo:** Portar el Tetris standalone de `references/started-games/03-tetris/game.js` a un componente cliente que reemplaza el simulador falso de `/games/caida/play` y conecta su puntuación al ranking real de Supabase, generalizando de paso la plataforma con un registro de juegos que sustituye los cuatro `game.id === "rocas"` hardcodeados de SPEC 04 y SPEC 05.
