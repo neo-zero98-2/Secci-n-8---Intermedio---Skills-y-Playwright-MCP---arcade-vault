@@ -27,6 +27,17 @@ const MAX_DT = 50;
 // no atar el canvas al tema de la página.
 const GRID_LINE = "rgba(0, 245, 255, 0.18)";
 
+// Panel superpuesto: el original tenía un segundo canvas para NEXT y el HUD en
+// el DOM. Aquí el componente devuelve un único <canvas>, así que LÍNEAS y NEXT
+// se dibujan dentro, en la zona alta del tablero. El texto usa la monoespaciada
+// del sistema: `app/layout.tsx` no cablea `next/font`.
+const NEXT_BLOCK = 14;
+const PANEL_PAD = 6;
+const PANEL_BG = "rgba(0,0,0,0.55)";
+const PANEL_FONT = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+const PANEL_LABEL = "rgba(230,233,255,0.55)";
+const PANEL_VALUE = "#e6e9ff";
+
 // Colores y piezas del original, con sus 9 entradas: el índice 0 es nulo y los
 // 1–8 son I, O, T, S, Z, J, L y la "tuerca", una octava pieza inventada que no
 // existe en ningún Tetris y que deja un hueco imposible al asentarse.
@@ -341,8 +352,61 @@ function drawPiece(
       drawBlock(ctx, piece.x + c, y + r, piece.shape[r][c], BLOCK, alpha);
 }
 
-// El fantasma y el panel se suman aquí en los pasos siguientes; el orden de
-// pintado importa y queda en un solo sitio.
+function panelBox(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  ctx.fillStyle = PANEL_BG;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+}
+
+// LÍNEAS arriba a la izquierda. Ni puntuación ni nivel: esos dos viven en el
+// HUD de React y repetirlos aquí sería decir dos veces lo mismo.
+function drawLines(ctx: CanvasRenderingContext2D, g: GameState) {
+  const w = 74;
+  const h = 34;
+  panelBox(ctx, PANEL_PAD, PANEL_PAD, w, h);
+  ctx.font = PANEL_FONT;
+  ctx.textBaseline = "top";
+  ctx.fillStyle = PANEL_LABEL;
+  ctx.fillText("LÍNEAS", PANEL_PAD + 8, PANEL_PAD + 5);
+  ctx.fillStyle = PANEL_VALUE;
+  ctx.fillText(String(g.lines), PANEL_PAD + 8, PANEL_PAD + 18);
+}
+
+// NEXT arriba a la derecha, con la pieza centrada en una caja de 4×4 celdas
+// usando el mismo cálculo de offsets que drawNext() del original.
+function drawNext(ctx: CanvasRenderingContext2D, g: GameState) {
+  const w = 4 * NEXT_BLOCK + 16;
+  const h = 4 * NEXT_BLOCK + 22;
+  const x = W - PANEL_PAD - w;
+  const y = PANEL_PAD;
+  panelBox(ctx, x, y, w, h);
+  ctx.font = PANEL_FONT;
+  ctx.textBaseline = "top";
+  ctx.fillStyle = PANEL_LABEL;
+  ctx.fillText("NEXT", x + 8, y + 5);
+
+  const { shape } = g.next;
+  const offX = Math.floor((4 - shape[0].length) / 2);
+  const offY = Math.floor((4 - shape.length) / 2);
+  // drawBlock trabaja en celdas, así que se traslada el origen de la caja.
+  ctx.save();
+  ctx.translate(x + 8, y + 18);
+  for (let r = 0; r < shape.length; r++)
+    for (let c = 0; c < shape[r].length; c++)
+      drawBlock(ctx, offX + c, offY + r, shape[r][c], NEXT_BLOCK);
+  ctx.restore();
+}
+
+// El orden de pintado importa y queda en un solo sitio: el panel va después del
+// tablero y ANTES de la pieza actual, para que cuando la pila llegue arriba sea
+// la pieza la que se vea por encima del contador, y no al revés.
 function draw(ctx: CanvasRenderingContext2D, g: GameState) {
   ctx.clearRect(0, 0, W, H);
   drawGrid(ctx);
@@ -352,6 +416,10 @@ function draw(ctx: CanvasRenderingContext2D, g: GameState) {
 
   // La silueta translúcida marca dónde va a aterrizar la pieza.
   drawPiece(ctx, g.current, ghostY(g), 0.2);
+
+  drawLines(ctx, g);
+  drawNext(ctx, g);
+
   drawPiece(ctx, g.current, g.current.y);
 }
 
