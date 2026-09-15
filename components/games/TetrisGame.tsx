@@ -165,6 +165,87 @@ function lockPiece(g: GameState) {
   spawn(g);
 }
 
+function rotateCW(shape: number[][]): number[][] {
+  const rows = shape.length;
+  const cols = shape[0].length;
+  const result = Array.from({ length: cols }, () =>
+    new Array<number>(rows).fill(0),
+  );
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) result[c][rows - 1 - r] = shape[r][c];
+  return result;
+}
+
+// Wall kicks del original: se prueba la rotación en el sitio y, si no cabe,
+// desplazada hasta dos celdas a cada lado. No es SRS, y no pretende serlo.
+function tryRotate(g: GameState) {
+  const rotated = rotateCW(g.current.shape);
+  for (const kick of [0, -1, 1, -2, 2]) {
+    if (!collide(g.board, rotated, g.current.x + kick, g.current.y)) {
+      g.current.shape = rotated;
+      g.current.x += kick;
+      return;
+    }
+  }
+}
+
+function softDrop(g: GameState) {
+  if (!collide(g.board, g.current.shape, g.current.x, g.current.y + 1)) {
+    g.current.y++;
+    g.score += 1;
+  } else {
+    lockPiece(g);
+  }
+}
+
+// La pieza fantasma del paso 8 reutiliza este mismo cálculo.
+function ghostY(g: GameState): number {
+  let gy = g.current.y;
+  while (!collide(g.board, g.current.shape, g.current.x, gy + 1)) gy++;
+  return gy;
+}
+
+function hardDrop(g: GameState) {
+  const gy = ghostY(g);
+  g.score += (gy - g.current.y) * 2;
+  g.current.y = gy;
+  lockPiece(g);
+}
+
+// Teclas que el juego consume: sin preventDefault, las flechas y el espacio
+// hacen scroll de la página durante la partida. `KeyP` no se porta: la única
+// fuente de pausa es el botón del HUD.
+function handleKey(g: GameState, code: string) {
+  switch (code) {
+    case "ArrowLeft":
+      if (!collide(g.board, g.current.shape, g.current.x - 1, g.current.y))
+        g.current.x--;
+      break;
+    case "ArrowRight":
+      if (!collide(g.board, g.current.shape, g.current.x + 1, g.current.y))
+        g.current.x++;
+      break;
+    case "ArrowDown":
+      softDrop(g);
+      break;
+    case "ArrowUp":
+    case "KeyX":
+      tryRotate(g);
+      break;
+    case "Space":
+      hardDrop(g);
+      break;
+  }
+}
+
+const GAME_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Space",
+]);
+
 function createGame(): GameState {
   // init() del original: sortea la pieza en juego y la siguiente.
   return {
@@ -290,6 +371,14 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
       },
     };
 
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (GAME_KEYS.has(e.code)) e.preventDefault();
+      const g = gameRef.current;
+      if (!g || g.gameOver || propsRef.current.paused) return;
+      handleKey(g, e.code);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
     let frame = 0;
     // `lastTime` se refresca en cada frame, también en pausa: si no, al reanudar
     // llegaría un delta de varios segundos y la pieza bajaría de golpe.
@@ -314,6 +403,7 @@ export default function TetrisGame({ ref, ...props }: GameEngineProps) {
     return () => {
       apiRef.current = null;
       cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
