@@ -6,6 +6,7 @@ import type {
   GameEngineProps,
 } from "@/components/games/registry";
 import {
+  type BlockColor,
   drawSprite,
   LEVELS,
   loadSpritesheet,
@@ -42,6 +43,15 @@ const BASE_BALL_VY = -300;
 // cuele entre dos frames.
 const PADDLE_TOLERANCIA = 8;
 
+// Parrilla de bloques. `BLOCKS_ORIGIN_X` es el `(800 − 10 × 64) / 2` del
+// original, ya resuelto. Las columnas y filas no hacen falta como constantes:
+// las codifica la propia parrilla de `LEVELS`.
+const BLOCK_W = 64;
+const BLOCK_H = 24;
+const BLOCKS_ORIGIN_X = 80;
+const BLOCKS_ORIGIN_Y = 80;
+const PUNTOS_POR_BLOQUE = 10;
+
 // Las dos únicas teclas del juego. No se portan `P`, `p` ni `Escape`: el único
 // modo de pausar es el botón "PAUSA" del HUD, igual que en ROCAS y en CAÍDA.
 const TECLA_IZQUIERDA = "ArrowLeft";
@@ -54,9 +64,20 @@ const LOADING_FONT = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
 // Mutable y creado dentro del efecto: los globals de módulo del original
 // desaparecen para que dos montajes no compartan mundo.
 
+type Block = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: BlockColor;
+  alive: boolean;
+};
+
 type GameState = {
   paddle: { x: number; y: number; w: number; h: number };
   ball: { x: number; y: number; w: number; h: number; vx: number; vy: number };
+  blocks: Block[];
+  score: number;
   level: number; // 1–5
 };
 
@@ -67,10 +88,26 @@ function crearEstado(): GameState {
   const g: GameState = {
     paddle: { x: (W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
     ball: { x: 0, y: 0, w: BALL_SIZE, h: BALL_SIZE, vx: 0, vy: 0 },
+    blocks: [],
+    score: 0,
     level: 1,
   };
-  colocarPelotaSobrePala(g);
+  cargarNivel(g, 1);
   return g;
+}
+
+/** El `loadLevel()` del original: repone bloques y pelota, no toca puntuación. */
+function cargarNivel(g: GameState, n: number) {
+  g.level = n;
+  g.blocks = LEVELS[n - 1].blocks.map((b) => ({
+    x: BLOCKS_ORIGIN_X + b.col * BLOCK_W,
+    y: BLOCKS_ORIGIN_Y + b.row * BLOCK_H,
+    w: BLOCK_W,
+    h: BLOCK_H,
+    color: b.color,
+    alive: true,
+  }));
+  colocarPelotaSobrePala(g);
 }
 
 /** El `initBall()` del original: pelota sobre la pala y a la velocidad del nivel. */
@@ -124,6 +161,26 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
     ball.y = paddle.y - ball.h;
     ball.vy = -Math.abs(ball.vy);
   }
+
+  // Bloques: como en el original, un bloque por frame y `vy` invertida sin
+  // mirar por qué cara entró la pelota.
+  for (const block of g.blocks) {
+    if (!block.alive) continue;
+    if (!colisiona(ball, block)) continue;
+    block.alive = false;
+    g.score += PUNTOS_POR_BLOQUE;
+    ball.vy = -ball.vy;
+    break;
+  }
+}
+
+function colisiona(ball: GameState["ball"], block: Block) {
+  return (
+    ball.x < block.x + block.w &&
+    ball.x + ball.w > block.x &&
+    ball.y < block.y + block.h &&
+    ball.y + ball.h > block.y
+  );
 }
 
 // ── Dibujo ────────────────────────────────────────────────────────────────────
@@ -136,6 +193,10 @@ function dibujar(
   g: GameState,
 ) {
   fondo(ctx);
+  for (const block of g.blocks) {
+    if (block.alive)
+      drawSprite(ctx, sheet, block.color, block.x, block.y, block.w, block.h);
+  }
   drawSprite(
     ctx,
     sheet,
