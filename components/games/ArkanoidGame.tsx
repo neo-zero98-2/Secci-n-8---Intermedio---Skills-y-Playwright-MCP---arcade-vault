@@ -55,6 +55,8 @@ const BLOCKS_ORIGIN_X = 80;
 const BLOCKS_ORIGIN_Y = 80;
 const PUNTOS_POR_BLOQUE = 10;
 
+const VIDAS_INICIALES = 3;
+
 // Las dos únicas teclas del juego. No se portan `P`, `p` ni `Escape`: el único
 // modo de pausar es el botón "PAUSA" del HUD, igual que en ROCAS y en CAÍDA.
 const TECLA_IZQUIERDA = "ArrowLeft";
@@ -92,7 +94,11 @@ type GameState = {
   blocks: Block[];
   explosions: Explosion[];
   score: number;
+  lives: number;
   level: number; // 1–5
+  // No hay fase "win": limpiar el nivel 5 es fin de partida como cualquier otro.
+  // La pausa tampoco vive aquí, la manda la prop del mismo nombre.
+  phase: "playing" | "gameover";
 };
 
 /** Teclas pulsadas. Fuera del estado del juego: `restart()` lo limpia aparte. */
@@ -105,7 +111,9 @@ function crearEstado(): GameState {
     blocks: [],
     explosions: [],
     score: 0,
+    lives: VIDAS_INICIALES,
     level: 1,
+    phase: "playing",
   };
   cargarNivel(g, 1);
   return g;
@@ -142,6 +150,8 @@ function limitarPala(x: number) {
 // ── Actualización ─────────────────────────────────────────────────────────────
 
 function actualizar(g: GameState, dt: number, teclas: Teclas) {
+  if (g.phase !== "playing") return;
+
   if (teclas.izquierda)
     g.paddle.x = limitarPala(g.paddle.x - PADDLE_SPEED * dt);
   if (teclas.derecha) g.paddle.x = limitarPala(g.paddle.x + PADDLE_SPEED * dt);
@@ -194,6 +204,13 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
     });
     g.score += PUNTOS_POR_BLOQUE;
     ball.vy = -ball.vy;
+    // Nivel limpio: el siguiente llega con su multiplicador de velocidad y
+    // conserva puntuación y vidas. Limpiar el último es fin de partida, sin
+    // fase de victoria propia ni mensaje dentro del canvas.
+    if (g.blocks.every((b) => !b.alive)) {
+      if (g.level < LEVELS.length) cargarNivel(g, g.level + 1);
+      else g.phase = "gameover";
+    }
     break;
   }
 
@@ -201,6 +218,17 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
   // igual que en la fuente.
   for (const exp of g.explosions) exp.elapsed += dt * 1000;
   g.explosions = g.explosions.filter((exp) => exp.elapsed < EXPLOSION_DURATION);
+
+  // Pelota perdida por abajo.
+  if (ball.y > H) {
+    g.lives--;
+    if (g.lives <= 0) {
+      g.lives = 0;
+      g.phase = "gameover";
+    } else {
+      colocarPelotaSobrePala(g);
+    }
+  }
 }
 
 function colisiona(ball: GameState["ball"], block: Block) {
