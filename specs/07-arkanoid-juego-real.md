@@ -1,6 +1,6 @@
 # SPEC 07 — Arkanoid real en el slot "BLOQUE BUSTER"
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 04, SPEC 05, SPEC 06
 > **Fecha:** 2026-09-15
 > **Objetivo:** Portar el Arkanoid standalone de `references/started-games/04-arkanoid/` a un componente cliente que reemplaza el simulador falso de `/games/bloque-buster/play` y conecta su puntuación al ranking real de Supabase, sumándose al registro de motores que creó SPEC 06.
