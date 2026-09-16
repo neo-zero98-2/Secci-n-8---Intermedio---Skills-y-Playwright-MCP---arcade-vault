@@ -6,6 +6,7 @@ import type {
   GameEngineProps,
 } from "@/components/games/registry";
 import {
+  drawSprite,
   loadSpritesheet,
   type Spritesheet,
 } from "@/components/games/arkanoid-assets";
@@ -24,8 +25,69 @@ const MAX_DT = 0.05;
 
 const SPRITESHEET_SRC = "/games/bloque-buster/spritesheet-breakout.png";
 
+// Geometría y velocidad de la pala, portadas sin cambio de valor.
+const PADDLE_W = 81;
+const PADDLE_H = 14;
+const PADDLE_Y = 560;
+const PADDLE_SPEED = 400;
+
+// Las dos únicas teclas del juego. No se portan `P`, `p` ni `Escape`: el único
+// modo de pausar es el botón "PAUSA" del HUD, igual que en ROCAS y en CAÍDA.
+const TECLA_IZQUIERDA = "ArrowLeft";
+const TECLA_DERECHA = "ArrowRight";
+
 // Monoespaciada del sistema: `app/layout.tsx` no cablea `next/font`.
 const LOADING_FONT = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
+
+// ── Estado ────────────────────────────────────────────────────────────────────
+// Mutable y creado dentro del efecto: los globals de módulo del original
+// desaparecen para que dos montajes no compartan mundo.
+
+type GameState = {
+  paddle: { x: number; y: number; w: number; h: number };
+};
+
+/** Teclas pulsadas. Fuera del estado del juego: `restart()` lo limpia aparte. */
+type Teclas = { izquierda: boolean; derecha: boolean };
+
+function crearEstado(): GameState {
+  return {
+    paddle: { x: (W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
+  };
+}
+
+function limitarPala(x: number) {
+  return Math.max(0, Math.min(W - PADDLE_W, x));
+}
+
+// ── Actualización ─────────────────────────────────────────────────────────────
+
+function actualizar(g: GameState, dt: number, teclas: Teclas) {
+  if (teclas.izquierda)
+    g.paddle.x = limitarPala(g.paddle.x - PADDLE_SPEED * dt);
+  if (teclas.derecha) g.paddle.x = limitarPala(g.paddle.x + PADDLE_SPEED * dt);
+}
+
+// ── Dibujo ────────────────────────────────────────────────────────────────────
+// El HUD del original —puntuación, nivel y las pelotas de vidas— no se porta:
+// esos tres datos los pinta una sola vez el HUD de React.
+
+function dibujar(
+  ctx: CanvasRenderingContext2D,
+  sheet: Spritesheet,
+  g: GameState,
+) {
+  fondo(ctx);
+  drawSprite(
+    ctx,
+    sheet,
+    "paddle",
+    g.paddle.x,
+    g.paddle.y,
+    g.paddle.w,
+    g.paddle.h,
+  );
+}
 
 function fondo(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#000";
@@ -72,10 +134,43 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
 
     dibujarCargando(ctx);
 
+    const g = crearEstado();
+    const teclas: Teclas = { izquierda: false, derecha: false };
+
     apiRef.current = {
       restart: () => {},
       forceGameOver: () => {},
     };
+
+    // Teclado en `window`, con `e.code` como el resto del proyecto, y
+    // `preventDefault()` para que las flechas no hagan scroll de la página.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === TECLA_IZQUIERDA) {
+        e.preventDefault();
+        teclas.izquierda = true;
+      } else if (e.code === TECLA_DERECHA) {
+        e.preventDefault();
+        teclas.derecha = true;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === TECLA_IZQUIERDA) teclas.izquierda = false;
+      else if (e.code === TECLA_DERECHA) teclas.derecha = false;
+    };
+
+    // Control primario del original. El canvas está estirado por CSS, así que
+    // sin el escalado por `getBoundingClientRect` la pala no seguiría al cursor.
+    const onMouseMove = (e: MouseEvent) => {
+      if (propsRef.current.paused) return;
+      const rect = canvas.getBoundingClientRect();
+      const escalaX = canvas.width / rect.width;
+      const ratonX = (e.clientX - rect.left) * escalaX;
+      g.paddle.x = limitarPala(ratonX - g.paddle.w / 2);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    canvas.addEventListener("mousemove", onMouseMove);
 
     // El spritesheet solo existe a partir de su `onload`; el loop no corre antes.
     let sheet: Spritesheet | null = null;
@@ -90,9 +185,12 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
         lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, MAX_DT);
       lastTime = ts;
 
-      // El mundo —pala, pelota, bloques y explosiones— entra en los pasos
-      // siguientes. El loop ya tiene su reloj y su ritmo de dibujo.
-      if (sheet) fondo(ctx);
+      if (sheet) {
+        // En pausa no se actualiza, pero se sigue dibujando: el último frame
+        // queda estático detrás del modal de GamePlayer.
+        if (!propsRef.current.paused) actualizar(g, dt, teclas);
+        dibujar(ctx, sheet, g);
+      }
 
       frame = requestAnimationFrame(loop);
     };
@@ -110,6 +208,9 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
       apiRef.current = null;
       cancelarCarga();
       cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      canvas.removeEventListener("mousemove", onMouseMove);
     };
   }, []);
 
