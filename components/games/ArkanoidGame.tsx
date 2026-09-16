@@ -7,7 +7,10 @@ import type {
 } from "@/components/games/registry";
 import {
   type BlockColor,
+  drawFrame,
   drawSprite,
+  EXPLOSION_DURATION,
+  EXPLOSION_FRAMES,
   LEVELS,
   loadSpritesheet,
   type Spritesheet,
@@ -73,10 +76,21 @@ type Block = {
   alive: boolean;
 };
 
+/** `elapsed` en milisegundos: es la única magnitud del juego que no va en segundos. */
+type Explosion = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: BlockColor;
+  elapsed: number;
+};
+
 type GameState = {
   paddle: { x: number; y: number; w: number; h: number };
   ball: { x: number; y: number; w: number; h: number; vx: number; vy: number };
   blocks: Block[];
+  explosions: Explosion[];
   score: number;
   level: number; // 1–5
 };
@@ -89,6 +103,7 @@ function crearEstado(): GameState {
     paddle: { x: (W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
     ball: { x: 0, y: 0, w: BALL_SIZE, h: BALL_SIZE, vx: 0, vy: 0 },
     blocks: [],
+    explosions: [],
     score: 0,
     level: 1,
   };
@@ -107,6 +122,7 @@ function cargarNivel(g: GameState, n: number) {
     color: b.color,
     alive: true,
   }));
+  g.explosions = [];
   colocarPelotaSobrePala(g);
 }
 
@@ -168,10 +184,23 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
     if (!block.alive) continue;
     if (!colisiona(ball, block)) continue;
     block.alive = false;
+    g.explosions.push({
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
+      color: block.color,
+      elapsed: 0,
+    });
     g.score += PUNTOS_POR_BLOQUE;
     ball.vy = -ball.vy;
     break;
   }
+
+  // `EXPLOSION_DURATION` va en milisegundos, así que el delta se convierte aquí,
+  // igual que en la fuente.
+  for (const exp of g.explosions) exp.elapsed += dt * 1000;
+  g.explosions = g.explosions.filter((exp) => exp.elapsed < EXPLOSION_DURATION);
 }
 
 function colisiona(ball: GameState["ball"], block: Block) {
@@ -196,6 +225,21 @@ function dibujar(
   for (const block of g.blocks) {
     if (block.alive)
       drawSprite(ctx, sheet, block.color, block.x, block.y, block.w, block.h);
+  }
+  for (const exp of g.explosions) {
+    const i = Math.min(
+      Math.floor((exp.elapsed / EXPLOSION_DURATION) * 4),
+      EXPLOSION_FRAMES[exp.color].length - 1,
+    );
+    drawFrame(
+      ctx,
+      sheet,
+      EXPLOSION_FRAMES[exp.color][i],
+      exp.x,
+      exp.y,
+      exp.w,
+      exp.h,
+    );
   }
   drawSprite(
     ctx,
