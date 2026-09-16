@@ -345,6 +345,10 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
 
     const g = crearEstado();
     const teclas: Teclas = { izquierda: false, derecha: false };
+    // Los callbacks se emiten solo cuando el valor cambia respecto al último
+    // emitido, nunca en cada frame. El -1 inicial fuerza la primera emisión.
+    const emitido = { score: -1, lives: -1, level: -1 };
+    let gameOverEmitido = false;
     // Pools propios de este montaje: dos montajes de StrictMode no comparten
     // elementos `Audio`, y el cleanup corta el sonido al salir de la partida.
     const sonidos: Sonidos = {
@@ -405,6 +409,23 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
         // queda estático detrás del modal de GamePlayer.
         if (!propsRef.current.paused) actualizar(g, dt, teclas, sonidos);
         dibujar(ctx, sheet, g);
+
+        if (g.score !== emitido.score) {
+          emitido.score = g.score;
+          propsRef.current.onScoreChange(g.score);
+        }
+        if (g.lives !== emitido.lives) {
+          emitido.lives = g.lives;
+          propsRef.current.onLivesChange?.(g.lives);
+        }
+        if (g.level !== emitido.level) {
+          emitido.level = g.level;
+          propsRef.current.onLevelChange(g.level);
+        }
+        if (g.phase === "gameover" && !gameOverEmitido) {
+          gameOverEmitido = true;
+          propsRef.current.onGameOver(g.score);
+        }
       }
 
       frame = requestAnimationFrame(loop);
