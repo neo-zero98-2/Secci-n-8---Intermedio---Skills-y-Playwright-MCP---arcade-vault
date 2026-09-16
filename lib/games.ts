@@ -32,6 +32,10 @@ export const GAMES: Game[] = [
     color: "cyan",
     best: 28450,
     plays: "12.4K",
+    controls: [
+      { keys: ["Ratón"], action: "Mover la pala siguiendo el cursor" },
+      { keys: ["←", "→"], action: "Mover la pala" },
+    ],
   },
   {
     id: "caida",
