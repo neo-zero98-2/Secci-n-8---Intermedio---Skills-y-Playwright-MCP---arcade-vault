@@ -123,6 +123,15 @@ function crearEstado(): GameState {
   return g;
 }
 
+/**
+ * Partida nueva sobre el mismo objeto de estado, que el loop tiene capturado.
+ * El original no tiene reinicio total —su `loadLevel()` repone bloques y pelota
+ * pero nunca resetea puntuación ni vidas—, así que esto es código nuevo.
+ */
+function reiniciarEstado(g: GameState) {
+  Object.assign(g, crearEstado());
+}
+
 /** El `loadLevel()` del original: repone bloques y pelota, no toca puntuación. */
 function cargarNivel(g: GameState, n: number) {
   g.level = n;
@@ -237,14 +246,17 @@ function actualizar(
   g.explosions = g.explosions.filter((exp) => exp.elapsed < EXPLOSION_DURATION);
 
   // Pelota perdida por abajo.
-  if (ball.y > H) {
-    g.lives--;
-    if (g.lives <= 0) {
-      g.lives = 0;
-      g.phase = "gameover";
-    } else {
-      colocarPelotaSobrePala(g);
-    }
+  if (ball.y > H) perderPelota(g);
+}
+
+/** Descuenta una vida y repone la pelota; a cero vidas, fin de partida. */
+function perderPelota(g: GameState) {
+  g.lives--;
+  if (g.lives <= 0) {
+    g.lives = 0;
+    g.phase = "gameover";
+  } else {
+    colocarPelotaSobrePala(g);
   }
 }
 
@@ -357,8 +369,26 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
     };
 
     apiRef.current = {
-      restart: () => {},
-      forceGameOver: () => {},
+      // "JUGAR DE NUEVO": partida limpia. Resetear la caché a -1 fuerza a
+      // reemitir 0 puntos, 3 vidas y nivel 1; bajar el flag permite que el
+      // siguiente fin de partida vuelva a abrir el modal. Las teclas se limpian
+      // porque una flecha pulsada durante el modal no recibe su `keyup`.
+      restart: () => {
+        reiniciarEstado(g);
+        teclas.izquierda = false;
+        teclas.derecha = false;
+        emitido.score = -1;
+        emitido.lives = -1;
+        emitido.level = -1;
+        gameOverEmitido = false;
+      },
+      // Botón "FIN": el mismo camino que perder la última vida. Se ejecuta aquí
+      // y no en el siguiente `actualizar()` porque con el juego en pausa el loop
+      // no actualiza y el modal nunca llegaría a abrirse.
+      forceGameOver: () => {
+        g.lives = 1;
+        perderPelota(g);
+      },
     };
 
     // Teclado en `window`, con `e.code` como el resto del proyecto, y
