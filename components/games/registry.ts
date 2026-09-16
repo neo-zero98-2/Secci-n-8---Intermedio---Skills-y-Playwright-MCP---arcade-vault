@@ -1,4 +1,5 @@
 import type { ComponentType, Ref } from "react";
+import ArkanoidGame from "@/components/games/ArkanoidGame";
 import AsteroidsGame from "@/components/games/AsteroidsGame";
 import TetrisGame from "@/components/games/TetrisGame";
 
@@ -38,6 +39,12 @@ export type GameEngine = {
 export const GAME_ENGINES: Record<string, GameEngine> = {
   rocas: { Component: AsteroidsGame, hasLives: true, fitHeight: false },
   caida: { Component: TetrisGame, hasLives: false, fitHeight: true },
+  // 800×600 es el 4:3 exacto del marco CRT: no necesita `fitHeight`.
+  "bloque-buster": {
+    Component: ArkanoidGame,
+    hasLives: true,
+    fitHeight: false,
+  },
 };
 
 export function getGameEngine(id: string): GameEngine | undefined {
