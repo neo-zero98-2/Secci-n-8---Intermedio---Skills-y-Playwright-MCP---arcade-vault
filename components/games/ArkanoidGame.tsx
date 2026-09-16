@@ -7,6 +7,7 @@ import type {
 } from "@/components/games/registry";
 import {
   drawSprite,
+  LEVELS,
   loadSpritesheet,
   type Spritesheet,
 } from "@/components/games/arkanoid-assets";
@@ -31,6 +32,16 @@ const PADDLE_H = 14;
 const PADDLE_Y = 560;
 const PADDLE_SPEED = 400;
 
+// Geometría y velocidad base de la pelota. La `speed` del nivel las escala.
+const BALL_SIZE = 16;
+const BASE_BALL_VX = 200;
+const BASE_BALL_VY = -300;
+
+// Ventana de tolerancia del rebote en la pala: el original acepta el golpe
+// hasta 8 px por debajo de su borde superior, para que una pelota rápida no se
+// cuele entre dos frames.
+const PADDLE_TOLERANCIA = 8;
+
 // Las dos únicas teclas del juego. No se portan `P`, `p` ni `Escape`: el único
 // modo de pausar es el botón "PAUSA" del HUD, igual que en ROCAS y en CAÍDA.
 const TECLA_IZQUIERDA = "ArrowLeft";
@@ -45,15 +56,30 @@ const LOADING_FONT = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
 
 type GameState = {
   paddle: { x: number; y: number; w: number; h: number };
+  ball: { x: number; y: number; w: number; h: number; vx: number; vy: number };
+  level: number; // 1–5
 };
 
 /** Teclas pulsadas. Fuera del estado del juego: `restart()` lo limpia aparte. */
 type Teclas = { izquierda: boolean; derecha: boolean };
 
 function crearEstado(): GameState {
-  return {
+  const g: GameState = {
     paddle: { x: (W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H },
+    ball: { x: 0, y: 0, w: BALL_SIZE, h: BALL_SIZE, vx: 0, vy: 0 },
+    level: 1,
   };
+  colocarPelotaSobrePala(g);
+  return g;
+}
+
+/** El `initBall()` del original: pelota sobre la pala y a la velocidad del nivel. */
+function colocarPelotaSobrePala(g: GameState) {
+  const { speed } = LEVELS[g.level - 1];
+  g.ball.x = g.paddle.x + (g.paddle.w - g.ball.w) / 2;
+  g.ball.y = g.paddle.y - g.ball.h;
+  g.ball.vx = BASE_BALL_VX * speed;
+  g.ball.vy = BASE_BALL_VY * speed;
 }
 
 function limitarPala(x: number) {
@@ -66,6 +92,38 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
   if (teclas.izquierda)
     g.paddle.x = limitarPala(g.paddle.x - PADDLE_SPEED * dt);
   if (teclas.derecha) g.paddle.x = limitarPala(g.paddle.x + PADDLE_SPEED * dt);
+
+  const { ball, paddle } = g;
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  // Muros izquierdo, derecho y superior: se reposiciona además de invertir, para
+  // que la pelota no se quede pegada rebotando dentro de la pared.
+  if (ball.x <= 0) {
+    ball.x = 0;
+    ball.vx = Math.abs(ball.vx);
+  }
+  if (ball.x + ball.w >= W) {
+    ball.x = W - ball.w;
+    ball.vx = -Math.abs(ball.vx);
+  }
+  if (ball.y <= 0) {
+    ball.y = 0;
+    ball.vy = Math.abs(ball.vy);
+  }
+
+  // Pala. Como en el original, el rebote no recalcula `vx`: el ángulo de la
+  // pelota no cambia en toda la partida. Es un port, no un rediseño.
+  if (
+    ball.vy > 0 &&
+    ball.x + ball.w > paddle.x &&
+    ball.x < paddle.x + paddle.w &&
+    ball.y + ball.h >= paddle.y &&
+    ball.y + ball.h <= paddle.y + paddle.h + PADDLE_TOLERANCIA
+  ) {
+    ball.y = paddle.y - ball.h;
+    ball.vy = -Math.abs(ball.vy);
+  }
 }
 
 // ── Dibujo ────────────────────────────────────────────────────────────────────
@@ -87,6 +145,7 @@ function dibujar(
     g.paddle.w,
     g.paddle.h,
   );
+  drawSprite(ctx, sheet, "ball", g.ball.x, g.ball.y, g.ball.w, g.ball.h);
 }
 
 function fondo(ctx: CanvasRenderingContext2D) {
