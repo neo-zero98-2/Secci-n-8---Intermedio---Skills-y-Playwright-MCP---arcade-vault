@@ -7,12 +7,14 @@ import type {
 } from "@/components/games/registry";
 import {
   type BlockColor,
+  createSoundPool,
   drawFrame,
   drawSprite,
   EXPLOSION_DURATION,
   EXPLOSION_FRAMES,
   LEVELS,
   loadSpritesheet,
+  type SoundPool,
   type Spritesheet,
 } from "@/components/games/arkanoid-assets";
 
@@ -29,6 +31,8 @@ const H = 600;
 const MAX_DT = 0.05;
 
 const SPRITESHEET_SRC = "/games/bloque-buster/spritesheet-breakout.png";
+const BOUNCE_SRC = "/games/bloque-buster/sounds/ball-bounce.mp3";
+const BREAK_SRC = "/games/bloque-buster/sounds/break-sound.mp3";
 
 // Geometría y velocidad de la pala, portadas sin cambio de valor.
 const PADDLE_W = 81;
@@ -149,7 +153,15 @@ function limitarPala(x: number) {
 
 // ── Actualización ─────────────────────────────────────────────────────────────
 
-function actualizar(g: GameState, dt: number, teclas: Teclas) {
+/** Los dos sonidos del original, ya como pools. */
+type Sonidos = { rebote: SoundPool; rotura: SoundPool };
+
+function actualizar(
+  g: GameState,
+  dt: number,
+  teclas: Teclas,
+  sonidos: Sonidos,
+) {
   if (g.phase !== "playing") return;
 
   if (teclas.izquierda)
@@ -165,14 +177,17 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
   if (ball.x <= 0) {
     ball.x = 0;
     ball.vx = Math.abs(ball.vx);
+    sonidos.rebote.play();
   }
   if (ball.x + ball.w >= W) {
     ball.x = W - ball.w;
     ball.vx = -Math.abs(ball.vx);
+    sonidos.rebote.play();
   }
   if (ball.y <= 0) {
     ball.y = 0;
     ball.vy = Math.abs(ball.vy);
+    sonidos.rebote.play();
   }
 
   // Pala. Como en el original, el rebote no recalcula `vx`: el ángulo de la
@@ -186,6 +201,7 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
   ) {
     ball.y = paddle.y - ball.h;
     ball.vy = -Math.abs(ball.vy);
+    sonidos.rebote.play();
   }
 
   // Bloques: como en el original, un bloque por frame y `vy` invertida sin
@@ -204,6 +220,7 @@ function actualizar(g: GameState, dt: number, teclas: Teclas) {
     });
     g.score += PUNTOS_POR_BLOQUE;
     ball.vy = -ball.vy;
+    sonidos.rotura.play();
     // Nivel limpio: el siguiente llega con su multiplicador de velocidad y
     // conserva puntuación y vidas. Limpiar el último es fin de partida, sin
     // fase de victoria propia ni mensaje dentro del canvas.
@@ -328,6 +345,12 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
 
     const g = crearEstado();
     const teclas: Teclas = { izquierda: false, derecha: false };
+    // Pools propios de este montaje: dos montajes de StrictMode no comparten
+    // elementos `Audio`, y el cleanup corta el sonido al salir de la partida.
+    const sonidos: Sonidos = {
+      rebote: createSoundPool(BOUNCE_SRC),
+      rotura: createSoundPool(BREAK_SRC),
+    };
 
     apiRef.current = {
       restart: () => {},
@@ -380,7 +403,7 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
       if (sheet) {
         // En pausa no se actualiza, pero se sigue dibujando: el último frame
         // queda estático detrás del modal de GamePlayer.
-        if (!propsRef.current.paused) actualizar(g, dt, teclas);
+        if (!propsRef.current.paused) actualizar(g, dt, teclas, sonidos);
         dibujar(ctx, sheet, g);
       }
 
@@ -403,6 +426,8 @@ export default function ArkanoidGame({ ref, ...props }: GameEngineProps) {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       canvas.removeEventListener("mousemove", onMouseMove);
+      sonidos.rebote.dispose();
+      sonidos.rotura.dispose();
     };
   }, []);
 
