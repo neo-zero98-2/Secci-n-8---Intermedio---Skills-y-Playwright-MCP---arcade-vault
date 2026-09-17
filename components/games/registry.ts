@@ -1,6 +1,7 @@
 import type { ComponentType, Ref } from "react";
 import ArkanoidGame from "@/components/games/ArkanoidGame";
 import AsteroidsGame from "@/components/games/AsteroidsGame";
+import SnakeGame from "@/components/games/SnakeGame";
 import TetrisGame from "@/components/games/TetrisGame";
 
 // ── Contrato de motor ─────────────────────────────────────────────────────────
@@ -45,6 +46,8 @@ export const GAME_ENGINES: Record<string, GameEngine> = {
     hasLives: true,
     fitHeight: false,
   },
+  // Grilla de 32×24 celdas de 25 px: otros 800×600, tampoco necesita letterbox.
+  serpentina: { Component: SnakeGame, hasLives: true, fitHeight: false },
 };
 
 export function getGameEngine(id: string): GameEngine | undefined {
