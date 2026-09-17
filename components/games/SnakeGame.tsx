@@ -68,12 +68,28 @@ const MAX_LEVEL = 10;
 // Pausa tras chocar, antes de reaparecer. Los muros matan: con wrap toroidal
 // solo se moriría por autocolisión y las vidas casi nunca entrarían en juego.
 const DYING_MS = 1500;
+/** Periodo del parpadeo mientras dura `dying`. */
+const BLINK_MS = 150;
 
 // El delta va en segundos y se capa: sin el cap, volver de una pestaña en
 // segundo plano acumularía decenas de ticks de golpe y la serpiente se
 // estrellaría sola. Con 0,05 s nunca entra más de un tick por frame, ni
 // siquiera a 20 pasos/s.
 const MAX_DT = 0.05;
+
+// ── Paleta ────────────────────────────────────────────────────────────────────
+// Los valores salen del sistema de diseño de `app/globals.css` —`--green` y
+// `--cyan`—, escritos aquí en crudo porque el canvas no resuelve variables CSS.
+// El fondo es un punto más azulado que `--bg` para que el tablero se despegue
+// del marco del CRT sin romper la gama.
+const COLOR_FONDO = "#0a0a18";
+const COLOR_GRILLA = "rgba(0, 245, 255, 0.055)";
+const COLOR_BORDE = "rgba(0, 245, 255, 0.28)";
+const COLOR_CUERPO = "#00ff88"; // --green
+const COLOR_CABEZA = "#7dffc0";
+const RADIO_SEGMENTO = 5;
+const GLOW_CABEZA = 18;
+const GLOW_CUERPO = 10;
 
 // Monoespaciada del sistema: `app/layout.tsx` no cablea `next/font`.
 const LOADING_FONT = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -291,13 +307,13 @@ function encolarGiro(g: GameState, dir: Cell) {
 // sola vez, en React.
 
 function fondo(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = COLOR_FONDO;
   ctx.fillRect(0, 0, W, H);
 }
 
 /** Grilla tenue de 25 px: da escala al tablero sin competir con la serpiente. */
 function grilla(ctx: CanvasRenderingContext2D) {
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.strokeStyle = COLOR_GRILLA;
   ctx.lineWidth = 1;
   ctx.beginPath();
   // El medio píxel evita que las líneas salgan borrosas a dos píxeles de ancho.
@@ -312,6 +328,16 @@ function grilla(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
+/**
+ * Borde del tablero en cian tenue. No es adorno: marca exactamente la línea que
+ * cuesta una vida, que si no queda a merced del bisel del marco CRT.
+ */
+function borde(ctx: CanvasRenderingContext2D) {
+  ctx.strokeStyle = COLOR_BORDE;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W - 2, H - 2);
+}
+
 function dibujar(
   ctx: CanvasRenderingContext2D,
   g: GameState,
@@ -319,11 +345,14 @@ function dibujar(
 ) {
   fondo(ctx);
   grilla(ctx);
+  borde(ctx);
   if (g.phase === "loading" || !atlas) {
     rotuloCargando(ctx);
     return;
   }
   if (g.fruit) {
+    // Sin sombra heredada: la fruta es un sprite, no una fuente de luz.
+    ctx.shadowBlur = 0;
     drawFruit(
       ctx,
       atlas,
@@ -336,13 +365,70 @@ function dibujar(
   serpiente(ctx, g);
 }
 
-/** Cuerpo y cabeza. El paso 8 se encarga del brillo, los ojos y el parpadeo. */
+/**
+ * Cuerpo, cabeza y ojos. Durante `dying` la serpiente parpadea con periodo
+ * `BLINK_MS`: es la única señal de que se ha perdido una vida dentro del
+ * canvas, porque el recuento vive en el HUD de React.
+ */
 function serpiente(ctx: CanvasRenderingContext2D, g: GameState) {
+  if (g.phase === "dying" && Math.floor(g.dyingMs / BLINK_MS) % 2 === 0) return;
+
+  ctx.save();
+  // De la cola a la cabeza, para que la cabeza quede encima en los giros
+  // cerrados y su brillo no lo tape el segmento siguiente.
   for (let i = g.snake.length - 1; i >= 0; i--) {
     const seg = g.snake[i];
-    ctx.fillStyle = i === 0 ? "#8effc1" : "#00ff9c";
-    ctx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2);
+    const esCabeza = i === 0;
+    // El brillo se apaga hacia la cola: el rastro de fósforo del CRT que enmarca
+    // todo el sitio, y de paso deja leer de un vistazo hacia dónde va.
+    const desvanecido = 1 - (i / Math.max(g.snake.length, 1)) * 0.55;
+    ctx.globalAlpha = esCabeza ? 1 : desvanecido;
+    ctx.fillStyle = esCabeza ? COLOR_CABEZA : COLOR_CUERPO;
+    ctx.shadowColor = esCabeza ? COLOR_CABEZA : COLOR_CUERPO;
+    ctx.shadowBlur = esCabeza ? GLOW_CABEZA : GLOW_CUERPO * desvanecido;
+    ctx.beginPath();
+    ctx.roundRect(
+      seg.x * CELL + 1.5,
+      seg.y * CELL + 1.5,
+      CELL - 3,
+      CELL - 3,
+      RADIO_SEGMENTO,
+    );
+    ctx.fill();
   }
+  ctx.restore();
+  ojos(ctx, g);
+}
+
+/**
+ * Dos ojos mirando hacia donde se mueve la serpiente. Van perforados en el
+ * color del tablero en vez de pintados en negro, así que son literalmente
+ * huecos por los que se ve el fondo.
+ */
+function ojos(ctx: CanvasRenderingContext2D, g: GameState) {
+  const cabeza = g.snake[0];
+  const cx = cabeza.x * CELL + CELL / 2;
+  const cy = cabeza.y * CELL + CELL / 2;
+  // Perpendicular a la marcha: separa los dos ojos sin depender de la dirección.
+  const px = -g.dir.y;
+  const py = g.dir.x;
+  const avance = CELL * 0.17;
+  const separacion = CELL * 0.2;
+
+  ctx.save();
+  ctx.fillStyle = COLOR_FONDO;
+  for (const lado of [1, -1]) {
+    ctx.beginPath();
+    ctx.arc(
+      cx + g.dir.x * avance + px * separacion * lado,
+      cy + g.dir.y * avance + py * separacion * lado,
+      2.4,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // El canvas ya está montado mientras el PNG viaja, así que la espera se anuncia
