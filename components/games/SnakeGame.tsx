@@ -7,6 +7,7 @@ import type {
 } from "@/components/games/registry";
 import {
   drawFruit,
+  FRUIT_KEYS,
   FRUITS_SRC,
   type FruitKey,
   type FruitsAtlas,
@@ -57,6 +58,9 @@ const TECLAS: Record<string, Cell> = {
 /** Más de dos giros pendientes serían teclazos que el jugador ya no recuerda. */
 const MAX_QUEUED = 2;
 
+/** Puntos por fruta: siempre `POINTS_PER_FRUIT * level`. */
+const POINTS_PER_FRUIT = 10;
+
 // El delta va en segundos y se capa: sin el cap, volver de una pestaña en
 // segundo plano acumularía decenas de ticks de golpe y la serpiente se
 // estrellaría sola. Con 0,05 s nunca entra más de un tick por frame, ni
@@ -100,16 +104,11 @@ function serpienteInicial(): Cell[] {
 }
 
 function crearEstado(): GameState {
-  return {
+  const g: GameState = {
     snake: serpienteInicial(),
     dir: { x: 1, y: 0 },
     queued: [],
-    // Paso 3: fruta fija en el centro para validar el escalado a la celda. El
-    // paso 5 la sustituye por el sorteo entre celdas libres y las 22 claves.
-    fruit: {
-      cell: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
-      key: "banana",
-    },
+    fruit: null,
     acc: 0,
     eaten: 0,
     score: 0,
@@ -119,6 +118,34 @@ function crearEstado(): GameState {
     phase: "loading",
     dyingMs: 0,
   };
+  sortearFruta(g);
+  return g;
+}
+
+/**
+ * Coloca una fruta nueva: celda uniformemente aleatoria entre las **libres** y
+ * clave uniformemente aleatoria entre las 22 del atlas.
+ *
+ * Se sortea sobre la lista de celdas libres y no por reintentos aleatorios: con
+ * la serpiente ocupando casi todo el tablero, reintentar degeneraría en decenas
+ * de tiradas fallidas, mientras que así siempre termina. Si no queda ninguna
+ * celda libre, la fruta se queda a `null` y el tablero se ha completado.
+ */
+function sortearFruta(g: GameState) {
+  const ocupadas = new Set(g.snake.map((c) => c.y * COLS + c.x));
+  const libres: Cell[] = [];
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (!ocupadas.has(y * COLS + x)) libres.push({ x, y });
+    }
+  }
+  if (libres.length === 0) {
+    g.fruit = null;
+    return;
+  }
+  const cell = libres[Math.floor(Math.random() * libres.length)];
+  const key = FRUIT_KEYS[Math.floor(Math.random() * FRUIT_KEYS.length)];
+  g.fruit = { cell, key };
 }
 
 // ── Actualización ─────────────────────────────────────────────────────────────
@@ -150,9 +177,23 @@ function tick(g: GameState) {
   const cabeza = g.snake[0];
   const nueva: Cell = { x: cabeza.x + g.dir.x, y: cabeza.y + g.dir.y };
   g.snake.unshift(nueva);
-  // Todavía no hay comida ni colisiones: la cola siempre suelta un segmento y
-  // la serpiente puede salirse del tablero sin consecuencias.
-  g.snake.pop();
+
+  // Comer es, literalmente, no soltar la cola este tick: la serpiente crece
+  // exactamente un segmento y el resto del movimiento es el de siempre. Las
+  // 22 frutas valen lo mismo; quien premia jugar rápido es el multiplicador
+  // por nivel. Todavía no hay colisiones: la serpiente sale del tablero sin
+  // consecuencias.
+  const comida =
+    g.fruit !== null &&
+    nueva.x === g.fruit.cell.x &&
+    nueva.y === g.fruit.cell.y;
+  if (comida) {
+    g.eaten++;
+    g.score += POINTS_PER_FRUIT * g.level;
+    sortearFruta(g);
+  } else {
+    g.snake.pop();
+  }
 }
 
 /**
