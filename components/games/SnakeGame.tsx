@@ -475,8 +475,16 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
     let gameOverEmitido = false;
 
     apiRef.current = {
+      // "JUGAR DE NUEVO": partida limpia. Resetear la caché a -1 fuerza a
+      // reemitir 0 puntos, 3 vidas y nivel 1; bajar el flag permite que el
+      // siguiente fin de partida vuelva a abrir el modal. El estado nuevo llega
+      // con `queued` vacío, así que una flecha pulsada mientras el modal estaba
+      // abierto no gira la serpiente al reanudar.
       restart: () => {
         gameRef.current = crearEstado();
+        // El atlas ya está cargado en este punto, así que la partida nueva no
+        // vuelve a pasar por "CARGANDO…" ni espera a nada.
+        if (atlas) gameRef.current.phase = "playing";
         emitido.score = -1;
         emitido.lives = -1;
         emitido.level = -1;
