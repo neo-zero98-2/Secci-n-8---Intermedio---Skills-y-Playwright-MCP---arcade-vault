@@ -61,6 +61,10 @@ const MAX_QUEUED = 2;
 /** Puntos por fruta: siempre `POINTS_PER_FRUIT * level`. */
 const POINTS_PER_FRUIT = 10;
 
+/** Frutas que hacen falta para subir un escalón, y tope de la escalera. */
+const FRUITS_PER_LEVEL = 5;
+const MAX_LEVEL = 10;
+
 // Pausa tras chocar, antes de reaparecer. Los muros matan: con wrap toroidal
 // solo se moriría por autocolisión y las vidas casi nunca entrarían en juego.
 const DYING_MS = 1500;
@@ -117,7 +121,7 @@ function crearEstado(): GameState {
     eaten: 0,
     score: 0,
     lives: START_LIVES,
-    level: 1,
+    level: nivelPara(0),
     // La partida no arranca hasta que el atlas resuelve.
     phase: "loading",
     dyingMs: 0,
@@ -153,6 +157,14 @@ function sortearFruta(g: GameState) {
 }
 
 // ── Actualización ─────────────────────────────────────────────────────────────
+
+/**
+ * El nivel es derivado, no un contador aparte: por eso sobrevive solo a la
+ * pérdida de una vida —`eaten` no se resetea— y no puede desincronizarse.
+ */
+function nivelPara(eaten: number) {
+  return Math.min(Math.floor(eaten / FRUITS_PER_LEVEL) + 1, MAX_LEVEL);
+}
 
 /** Duración del tick en segundos, según el nivel en curso. */
 function intervaloTick(g: GameState) {
@@ -213,7 +225,10 @@ function tick(g: GameState) {
     nueva.y === g.fruit.cell.y;
   if (comida) {
     g.eaten++;
+    // La fruta se paga al nivel que estaba en vigor al morderla; el escalón
+    // que ella misma desbloquea se cobra a partir de la siguiente.
     g.score += POINTS_PER_FRUIT * g.level;
+    g.level = nivelPara(g.eaten);
     sortearFruta(g);
   } else {
     g.snake.pop();
