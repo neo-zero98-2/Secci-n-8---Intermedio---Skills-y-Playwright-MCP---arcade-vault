@@ -5,7 +5,13 @@ import type {
   GameEngineHandle,
   GameEngineProps,
 } from "@/components/games/registry";
-import type { FruitKey } from "@/components/games/snake-assets";
+import {
+  drawFruit,
+  FRUITS_SRC,
+  type FruitKey,
+  type FruitsAtlas,
+  loadFruitsAtlas,
+} from "@/components/games/snake-assets";
 
 // SERPENTINA no es un port: no hay `game.js` de origen, solo el atlas de
 // frutas. Las reglas —velocidad, vidas, puntuación y reaparición— las fija
@@ -78,7 +84,12 @@ function crearEstado(): GameState {
     snake: serpienteInicial(),
     dir: { x: 1, y: 0 },
     queued: [],
-    fruit: null,
+    // Paso 3: fruta fija en el centro para validar el escalado a la celda. El
+    // paso 5 la sustituye por el sorteo entre celdas libres y las 22 claves.
+    fruit: {
+      cell: { x: Math.floor(COLS / 2), y: Math.floor(ROWS / 2) },
+      key: "banana",
+    },
     acc: 0,
     eaten: 0,
     score: 0,
@@ -123,10 +134,27 @@ function grilla(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function dibujar(ctx: CanvasRenderingContext2D, g: GameState) {
+function dibujar(
+  ctx: CanvasRenderingContext2D,
+  g: GameState,
+  atlas: FruitsAtlas | null,
+) {
   fondo(ctx);
   grilla(ctx);
-  if (g.phase === "loading") rotuloCargando(ctx);
+  if (g.phase === "loading" || !atlas) {
+    rotuloCargando(ctx);
+    return;
+  }
+  if (g.fruit) {
+    drawFruit(
+      ctx,
+      atlas,
+      g.fruit.key,
+      g.fruit.cell.x * CELL,
+      g.fruit.cell.y * CELL,
+      CELL,
+    );
+  }
 }
 
 // El canvas ya está montado mientras el PNG viaja, así que la espera se anuncia
@@ -187,6 +215,9 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
       },
     };
 
+    // El atlas solo existe a partir de su `onload`; hasta entonces el loop ya
+    // corre, pero pinta el rótulo de espera en vez del tablero.
+    let atlas: FruitsAtlas | null = null;
     let frame = 0;
     // `lastTime` se refresca en cada frame, también en pausa: si no, al reanudar
     // llegaría un delta de varios segundos de golpe.
@@ -202,7 +233,7 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
         // En pausa no se actualiza, pero se sigue dibujando: el último frame
         // queda estático detrás del modal de GamePlayer.
         if (!propsRef.current.paused) actualizar(g, dt);
-        dibujar(ctx, g);
+        dibujar(ctx, g, atlas);
 
         if (g.score !== emitido.score) {
           emitido.score = g.score;
@@ -225,10 +256,19 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
       frame = requestAnimationFrame(loop);
     };
 
+    // Si el componente se desmonta mientras el PNG viaja, `cancelarCarga` impide
+    // que el `onload` toque un estado que ya no se dibuja.
+    const cancelarCarga = loadFruitsAtlas(FRUITS_SRC, (cargado) => {
+      atlas = cargado;
+      const g = gameRef.current;
+      if (g && g.phase === "loading") g.phase = "playing";
+    });
+
     frame = requestAnimationFrame(loop);
 
     return () => {
       apiRef.current = null;
+      cancelarCarga();
       cancelAnimationFrame(frame);
     };
   }, []);
