@@ -19,6 +19,9 @@ import {
 // SPEC 04: estado en refs, loop de `requestAnimationFrame`, HUD solo en React y
 // fin de partida solo en el modal de `GamePlayer`.
 
+/** Coordenadas de grilla, no de píxel. */
+type Cell = { x: number; y: number };
+
 // ── Tablero ───────────────────────────────────────────────────────────────────
 // 32 × 25 = 800 y 24 × 25 = 600: la grilla encaja sin resto en el 4:3 exacto del
 // marco CRT, así que no hay franjas muertas ni celdas partidas y el registro no
@@ -34,6 +37,26 @@ const START_LIVES = 3;
 /** Segmentos al nacer y al reaparecer. */
 const START_LEN = 3;
 
+/**
+ * Pasos por segundo, índice = `level - 1`; el tick dura `1 / valor` segundos.
+ * Es una tabla explícita y no una fórmula: "+2 por nivel" llegaría a 26 pasos/s
+ * en el nivel 10 y haría el juego injugable, mientras que la tabla aterriza
+ * exactamente en el tope decidido y se ajusta sin tocar código.
+ */
+const STEPS_PER_SEC = [8, 9, 10, 11, 12, 13, 15, 17, 18, 20];
+
+// Las cuatro únicas teclas del juego. Sin WASD: SERPENTINA se controla como
+// ROCAS y CAÍDA, y separarla no aportaría nada.
+const TECLAS: Record<string, Cell> = {
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+};
+
+/** Más de dos giros pendientes serían teclazos que el jugador ya no recuerda. */
+const MAX_QUEUED = 2;
+
 // El delta va en segundos y se capa: sin el cap, volver de una pestaña en
 // segundo plano acumularía decenas de ticks de golpe y la serpiente se
 // estrellaría sola. Con 0,05 s nunca entra más de un tick por frame, ni
@@ -46,9 +69,6 @@ const LOADING_FONT = "bold 20px ui-monospace, SFMono-Regular, Menlo, monospace";
 // ── Estado ────────────────────────────────────────────────────────────────────
 // Mutable y creado dentro del efecto: a nivel de módulo solo viven constantes y
 // funciones puras, para que dos montajes no compartan mundo.
-
-/** Coordenadas de grilla, no de píxel. */
-type Cell = { x: number; y: number };
 
 type Phase = "loading" | "playing" | "dying" | "gameover";
 
@@ -103,9 +123,49 @@ function crearEstado(): GameState {
 
 // ── Actualización ─────────────────────────────────────────────────────────────
 
+/** Duración del tick en segundos, según el nivel en curso. */
+function intervaloTick(g: GameState) {
+  return 1 / STEPS_PER_SEC[g.level - 1];
+}
+
+// El loop va a `requestAnimationFrame`, pero el juego avanza por ticks
+// discretos: entre tick y tick no hay interpolación, la serpiente se dibuja
+// siempre alineada a la grilla. El cap de `dt` acota a un tick por frame.
 function actualizar(g: GameState, dt: number) {
   if (g.phase !== "playing") return;
   g.acc += dt;
+  const intervalo = intervaloTick(g);
+  while (g.acc >= intervalo) {
+    g.acc -= intervalo;
+    tick(g);
+  }
+}
+
+function tick(g: GameState) {
+  // Un giro por tick: dos flechas pulsadas dentro del mismo tick se aplican en
+  // ticks consecutivos en vez de pisarse.
+  const giro = g.queued.shift();
+  if (giro) g.dir = giro;
+
+  const cabeza = g.snake[0];
+  const nueva: Cell = { x: cabeza.x + g.dir.x, y: cabeza.y + g.dir.y };
+  g.snake.unshift(nueva);
+  // Todavía no hay comida ni colisiones: la cola siempre suelta un segmento y
+  // la serpiente puede salirse del tablero sin consecuencias.
+  g.snake.pop();
+}
+
+/**
+ * Encola un giro. Se descarta el que invierte la dirección **aplicada** en el
+ * último tick —no la última encolada—, que es lo que evita que un doble giro
+ * rápido acabe en un 180° y la serpiente se muerda el cuello.
+ */
+function encolarGiro(g: GameState, dir: Cell) {
+  if (g.queued.length >= MAX_QUEUED) return;
+  const anterior = g.queued.length > 0 ? g.queued[g.queued.length - 1] : g.dir;
+  if (dir.x === -anterior.x && dir.y === -anterior.y) return;
+  if (dir.x === anterior.x && dir.y === anterior.y) return;
+  g.queued.push(dir);
 }
 
 // ── Dibujo ────────────────────────────────────────────────────────────────────
@@ -154,6 +214,16 @@ function dibujar(
       g.fruit.cell.y * CELL,
       CELL,
     );
+  }
+  serpiente(ctx, g);
+}
+
+/** Cuerpo y cabeza. El paso 8 se encarga del brillo, los ojos y el parpadeo. */
+function serpiente(ctx: CanvasRenderingContext2D, g: GameState) {
+  for (let i = g.snake.length - 1; i >= 0; i--) {
+    const seg = g.snake[i];
+    ctx.fillStyle = i === 0 ? "#8effc1" : "#00ff9c";
+    ctx.fillRect(seg.x * CELL + 1, seg.y * CELL + 1, CELL - 2, CELL - 2);
   }
 }
 
@@ -215,6 +285,24 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
       },
     };
 
+    // Teclado en `window`, con `e.code` como el resto del proyecto, y
+    // `preventDefault()` en las cuatro flechas para que la página no haga
+    // scroll mientras se juega.
+    const onKeyDown = (e: KeyboardEvent) => {
+      const dir = TECLAS[e.code];
+      if (!dir) return;
+      // `preventDefault` también en pausa: la flecha no debe hacer scroll de la
+      // página aunque el juego esté congelado.
+      e.preventDefault();
+      // En pausa el giro se descarta en vez de encolarse: si se guardara, al
+      // pulsar "REANUDAR" la serpiente saldría en otra dirección.
+      if (propsRef.current.paused) return;
+      const g = gameRef.current;
+      if (g) encolarGiro(g, dir);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
     // El atlas solo existe a partir de su `onload`; hasta entonces el loop ya
     // corre, pero pinta el rótulo de espera en vez del tablero.
     let atlas: FruitsAtlas | null = null;
@@ -270,6 +358,7 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
       apiRef.current = null;
       cancelarCarga();
       cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, []);
 
