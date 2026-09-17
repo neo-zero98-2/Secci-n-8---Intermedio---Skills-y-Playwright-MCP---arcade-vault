@@ -61,6 +61,10 @@ const MAX_QUEUED = 2;
 /** Puntos por fruta: siempre `POINTS_PER_FRUIT * level`. */
 const POINTS_PER_FRUIT = 10;
 
+// Pausa tras chocar, antes de reaparecer. Los muros matan: con wrap toroidal
+// solo se moriría por autocolisión y las vidas casi nunca entrarían en juego.
+const DYING_MS = 1500;
+
 // El delta va en segundos y se capa: sin el cap, volver de una pestaña en
 // segundo plano acumularía decenas de ticks de golpe y la serpiente se
 // estrellaría sola. Con 0,05 s nunca entra más de un tick por frame, ni
@@ -159,6 +163,13 @@ function intervaloTick(g: GameState) {
 // discretos: entre tick y tick no hay interpolación, la serpiente se dibuja
 // siempre alineada a la grilla. El cap de `dt` acota a un tick por frame.
 function actualizar(g: GameState, dt: number) {
+  // Tras chocar, el juego se queda quieto mientras la serpiente parpadea; al
+  // agotarse la cuenta atrás renace en el centro sin tocar marcador ni fruta.
+  if (g.phase === "dying") {
+    g.dyingMs -= dt * 1000;
+    if (g.dyingMs <= 0) renacer(g);
+    return;
+  }
   if (g.phase !== "playing") return;
   g.acc += dt;
   const intervalo = intervaloTick(g);
@@ -176,6 +187,19 @@ function tick(g: GameState) {
 
   const cabeza = g.snake[0];
   const nueva: Cell = { x: cabeza.x + g.dir.x, y: cabeza.y + g.dir.y };
+
+  // Muro o cuerpo propio: el mismo desenlace. La cola no cuenta como choque
+  // porque en este mismo tick la suelta, salvo que la serpiente esté creciendo.
+  const contraMuro =
+    nueva.x < 0 || nueva.x >= COLS || nueva.y < 0 || nueva.y >= ROWS;
+  const contraCola = g.snake.some(
+    (seg, i) => i < g.snake.length - 1 && seg.x === nueva.x && seg.y === nueva.y,
+  );
+  if (contraMuro || contraCola) {
+    chocar(g);
+    return;
+  }
+
   g.snake.unshift(nueva);
 
   // Comer es, literalmente, no soltar la cola este tick: la serpiente crece
@@ -193,6 +217,44 @@ function tick(g: GameState) {
     sortearFruta(g);
   } else {
     g.snake.pop();
+  }
+}
+
+/**
+ * Descuenta una vida. Con vidas de sobra la serpiente entra en `dying` y
+ * reaparece; con la última, fin de partida: el modal de `GamePlayer` es el
+ * único final, el canvas no dibuja ningún "GAME OVER" ni acepta reinicio.
+ */
+function chocar(g: GameState) {
+  g.lives--;
+  if (g.lives <= 0) {
+    g.lives = 0;
+    g.phase = "gameover";
+    return;
+  }
+  g.phase = "dying";
+  g.dyingMs = DYING_MS;
+}
+
+/**
+ * Serpiente nueva de `START_LEN` segmentos en el centro, mirando a la derecha.
+ * `score`, `eaten`, `level` y la fruta en juego quedan intactos: reaparecer con
+ * la longitud acumulada obligaría a resolver el caso de una serpiente que ya no
+ * cabe estirada en el centro, y reiniciar el nivel castigaría dos veces el
+ * mismo error.
+ */
+function renacer(g: GameState) {
+  g.snake = serpienteInicial();
+  g.dir = { x: 1, y: 0 };
+  g.queued = [];
+  g.acc = 0;
+  g.dyingMs = 0;
+  g.phase = "playing";
+  // La fruta pudo quedar bajo la serpiente recién nacida: solo en ese caso se
+  // vuelve a sortear, para no cambiarle al jugador la fruta que ya perseguía.
+  const fruta = g.fruit;
+  if (fruta && g.snake.some((c) => c.x === fruta.cell.x && c.y === fruta.cell.y)) {
+    sortearFruta(g);
   }
 }
 
@@ -319,10 +381,15 @@ export default function SnakeGame({ ref, ...props }: GameEngineProps) {
         emitido.level = -1;
         gameOverEmitido = false;
       },
+      // Botón "FIN": no abre un camino nuevo. Pone la última vida y ejecuta el
+      // mismo choque, igual que `killShip(g)` en ROCAS. Se resuelve aquí y no
+      // en el siguiente `actualizar()` porque con el juego en pausa el loop no
+      // actualiza y el modal nunca llegaría a abrirse.
       forceGameOver: () => {
         const g = gameRef.current;
         if (!g) return;
-        g.phase = "gameover";
+        g.lives = 1;
+        chocar(g);
       },
     };
 
