@@ -1,6 +1,6 @@
 # SPEC 08 — Snake real en el slot "SERPENTINA"
 
-> **Estado:** Aprovado
+> **Estado:** Implementado
 > **Depende de:** SPEC 04, SPEC 05, SPEC 06
 > **Fecha:** 2026-09-17
 > **Objetivo:** Implementar desde cero un motor de Snake en `components/games/SnakeGame.tsx` que reemplaza el simulador falso de `/games/serpentina/play`, dibuja su comida con el atlas de `references/source-assets/snake-assets/` y conecta su puntuación al ranking real de Supabase.
