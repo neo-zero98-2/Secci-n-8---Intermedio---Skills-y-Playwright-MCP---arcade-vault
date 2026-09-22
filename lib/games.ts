@@ -64,6 +64,10 @@ export const GAMES: Game[] = [
     color: "green",
     best: 7820,
     plays: "9.1K",
+    controls: [
+      { keys: ["←", "→"], action: "Girar a izquierda o derecha" },
+      { keys: ["↑", "↓"], action: "Girar arriba o abajo" },
+    ],
   },
   {
     id: "gloton",
